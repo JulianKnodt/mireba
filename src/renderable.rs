@@ -1,26 +1,49 @@
-use crate::vec::Ray;
-use crate::vis::{Visible, Visibility};
-use crate::octree::{Bounded, Bounds};
+use crate::{
+  aabox::AABox,
+  bounds::{Bounded, Bounds},
+  indexed_triangles::IndexedTriangles,
+  plane::Plane,
+  sphere::Sphere,
+  vec::Ray,
+  vis::{Visibility, Visible},
+};
 use num::Float;
 
-// This file purely exists because of the stuff that Rust won't do easily.
-// Hopefully it can be deleted eventually.
-
-pub trait Renderable<'m, D: Float>: Visible<'m, D> + Bounded<D> {}
-impl<'m, D: Float, T> Renderable<'m, D> for T where T: Visible<'m, D> + Bounded<D> {}
-impl<'m, D: Float> Bounded<D> for Box<dyn Renderable<'m, D> + '_> {
-  fn bounds(&self) -> Bounds<D> { self.as_ref().bounds() }
-}
-impl<'m, D: Float> Visible<'m, D> for Box<dyn Renderable<'m, D> + '_> {
-  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'m, D>> { self.as_ref().hit(r) }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Renderable<'m, D> {
+  Sphere(Sphere<'m, D>),
+  AABox(AABox<'m, D>),
+  Plane(Plane<'m, D>),
+  IndexedTriangles(IndexedTriangles<'m, D>),
 }
 
-impl<'a, T, V: Visible<'a, T>> Visible<'a, T> for Vec<V>
-where
-  T: num::Float,
-{
-  fn hit(&self, r: &Ray<T>) -> Option<Visibility<'a, T>> {
-    let mut curr_bound = T::zero()..T::infinity();
+impl<'m, D: Float> Visible<'m, D> for Renderable<'m, D> {
+  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'m, D>> {
+    match self {
+      Renderable::Sphere(ref sphere) => sphere.hit(&r),
+      Renderable::AABox(ref aab) => aab.hit(&r),
+      Renderable::Plane(ref p) => p.hit(&r),
+      Renderable::IndexedTriangles(ref it) => it.hit(&r),
+    }
+  }
+}
+
+impl<'m, D: Float> Bounded<D> for Renderable<'m, D> {
+  fn bounds(&self) -> Bounds<D> {
+    match self {
+      Renderable::Sphere(ref sphere) => sphere.bounds(),
+      Renderable::AABox(ref aab) => aab.bounds(),
+      Renderable::IndexedTriangles(ref _it) => todo!(),
+
+      // These things are unbounded so just panic if they ever get called
+      Renderable::Plane(_) => panic!("Cannot bound plane"),
+    }
+  }
+}
+
+impl<'a, D: Float, V: Visible<'a, D>> Visible<'a, D> for Vec<V> {
+  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'a, D>> {
+    let mut curr_bound = D::zero()..D::infinity();
     self.iter().fold(None, |nearest, item| {
       match item.hit_bounded(r, curr_bound.clone()) {
         None => nearest,

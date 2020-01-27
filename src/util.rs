@@ -1,4 +1,5 @@
 // TODO might need to convert this into a different enum in the case of d == 0?
+#[inline]
 pub fn quad_solve<T>(a: T, b: T, c: T) -> Option<(T, T)>
 where
   T: num::Float, {

@@ -1,54 +1,79 @@
+#![allow(unused)]
+
+extern crate ezflags;
 extern crate num;
 extern crate rand;
 extern crate rand_distr;
+
 use crate::num::Zero;
+use ezflags::flag::FlagSet;
 use ray_weekend::{
-  material::{Dielectric, Lambertian, Metallic},
+  aabox::AABox,
+  bounds::Bounds,
+  indexed_triangles::from_ascii_stl,
+  material::{Checkers, Dielectric, Lambertian, Mat, Metallic},
+  plane::Plane,
+  renderable::Renderable,
   screen::Screen,
   sphere::Sphere,
+  timing::print_timed,
   vec::Vec3,
   vis::{color, Camera},
-  octree::{Octree},
-  renderable::Renderable,
 };
 
+#[allow(unused)]
 fn main() {
-  let (w, h) = (800, 600);
-  let n = 150;
+  let mut fs = FlagSet::new();
+  let mut w_flag = Some(800);
+  fs.add("w", "Width of output image", &mut w_flag);
+  let mut h_flag = Some(600);
+  fs.add("h", "Height of output image", &mut h_flag);
+  let mut n_flag = Some(35);
+  fs.add("n", "Number of rays to cast per pixel", &mut n_flag);
+  let mut output_file = Some(String::from("test.jpg"));
+  fs.add("out", "Output file name", &mut output_file);
+  fs.parse_args();
+  let (w, h) = (w_flag.unwrap(), h_flag.unwrap());
+  let n = n_flag.unwrap();
 
   let mut screen = Screen::new(w, h);
   let camera = Camera::aimed(
-    Vec3(-5., 2., 1.),
+    Vec3(0., 3., 1.),
     Vec3(0., 0., -1.),
     Vec3(0., 1., 0.),
     90.,
     (w / h) as f32,
   );
-  let lamb = Lambertian {
+  let lamb = Mat::from(Lambertian {
     albedo: Vec3(0.5, 0.5, 0.5),
-  };
-  let red_metal = Metallic::new(1.0, 0.8, 0.5, 0.25);
-  let di = Dielectric::new(1.5);
-  let items: Vec<Box<dyn Renderable<f32>>> = vec![
-    // Box::new(from_ascii_stl("./magnolia.stl", &lamb).unwrap()),
-    Box::new(Sphere::new(Vec3(0.0, 0.0, -1.0), 0.5, &red_metal)),
-    Box::new(Sphere::new(Vec3(0.0, -100.5, -1.0), 100.0, &lamb)),
-    Box::new(Sphere::new(Vec3(1.0, 0.0, -1.0), 0.5, &di)),
-    Box::new(Sphere::new(Vec3(-2.0, 0.0, -1.0), 0.5, &lamb)),
+  });
+  let red_metal = Mat::from(Metallic::new(Vec3(1.0, 0.8, 0.5), 0.25));
+  // let checkers = Mat::from(Checkers {});
+  let di = Mat::from(Dielectric::new(1.5));
+  let mut magnolia = from_ascii_stl("./magnolia.stl", &red_metal).unwrap();
+  magnolia.shift(Vec3(0.0, -1.0, -40.0));
+  magnolia.scale(0.06);
+  let items: Vec<Renderable<_>> = vec![
+    // Renderable::Sphere(Sphere::new(Vec3(0.0, 0.0, -1.0), 0.5, &red_metal)),
+    // Renderable::Sphere(Sphere::new(Vec3(0.0, -100.5, -1.0), 100.0, &checkers)),
+    // Renderable::Sphere(Sphere::new(Vec3(1.0, 0.0, -1.0), 0.5, &di)),
+    // Renderable::Sphere(Sphere::new(Vec3(-2.0, 0.0, -1.0), 0.5, &lamb)),
+    // Renderable::Plane(Plane::new(Vec3(0.0, 0.0, 1.0), 10.0, &red_metal)),
+    Renderable::IndexedTriangles(magnolia),
   ];
-  // let oct = items.into_iter().collect::<Octree<_,_>>();
+
   println!("Starting to render");
   (0..w).for_each(|x| {
     (0..h).for_each(|y| {
       let color = camera
         .rays(n, x as f32, y as f32, w as f32, h as f32)
-        .iter()
         .fold(Vec3::zero(), |acc, r| {
-          acc + (color(r, &items).sqrt() * 255.9)
+          acc + (color(&r, &items).sqrt() * 255.9)
         })
         / (n as f32);
       screen.set(x, h - y - 1, color);
     });
   });
-  screen.write_image("test.jpg");
+  screen.write_image(output_file.unwrap());
+  print_timed();
 }

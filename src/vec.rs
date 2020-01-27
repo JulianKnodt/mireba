@@ -1,42 +1,10 @@
 extern crate rand_distr;
 use num::{Float, One, Zero};
-use std::ops::{Add, Div, Index, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Rem, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Vec3<T = f32>(pub T, pub T, pub T);
 
-macro_rules! def_op {
-  ($name: ident, $fn_name: ident, $op: tt) => {
-    impl<T>$name for Vec3<T> where T: $name {
-      type Output = Vec3<<T as $name>::Output>;
-      fn $fn_name(self, o: Self) -> Self::Output {
-        Vec3(self.0 $op o.0, self.1 $op o.1, self.2 $op o.2)
-      }
-    }
-  };
-}
-
-macro_rules! def_scalar_op {
-  ($name: ident, $fn_name: ident, $op: tt) => {
-    impl<T>$name<T> for Vec3<T> where T: $name + Copy {
-      type Output = Vec3<<T as $name>::Output>;
-      fn $fn_name(self, o: T) -> Self::Output {
-        Vec3(self.0 $op o, self.1 $op o, self.2 $op o)
-      }
-    }
-  };
-}
-
-// Define all vector-vector operations
-def_op!(Add, add, +);
-def_op!(Mul, mul, *);
-def_op!(Sub, sub, -);
-def_op!(Div, div, /);
-// Define all scalar-vector operations
-def_scalar_op!(Add, add, +);
-def_scalar_op!(Mul, mul, *);
-def_scalar_op!(Sub, sub, -);
-def_scalar_op!(Div, div, /);
 impl<T> Index<usize> for Vec3<T> {
   type Output = T;
   fn index(&self, idx: usize) -> &Self::Output { self.nth(idx as u8) }
@@ -95,11 +63,13 @@ impl<T: One + PartialEq> One for Vec3<T> {
 }
 
 impl<T: Float> Vec3<T> {
-  pub fn sqr_magn(&self) -> T { self.0.powi(2) + self.1.powi(2) + self.2.powi(2) }
+  pub fn sqr_magn(&self) -> T { self.0 * self.0 + self.1 * self.1 + self.2 * self.2 }
   pub fn magn(&self) -> T { self.sqr_magn().sqrt() }
   pub fn norm(&self) -> Self { (*self) / self.magn() }
   pub fn dot(&self, o: Self) -> T { self.0 * o.0 + self.1 * o.1 + self.2 * o.2 }
   pub fn sqrt(&self) -> Self { Vec3(self.0.sqrt(), self.1.sqrt(), self.2.sqrt()) }
+  pub fn sqr_dist(&self, o: &Self) -> T { (*self - *o).sqr_magn() }
+  pub fn floor(&self) -> Self { Vec3(self.0.floor(), self.1.floor(), self.2.floor()) }
   pub fn cross(&self, o: Self) -> Self {
     Vec3(
       self.1 * o.2 - self.2 * o.1,
@@ -163,6 +133,58 @@ impl<'a, T> Iterator for Iter<'a, T> {
     Some(out)
   }
 }
+
+macro_rules! def_op {
+  ($name: ident, $fn_name: ident, $op: tt) => {
+    impl<T>$name for Vec3<T> where T: $name {
+      type Output = Vec3<<T as $name>::Output>;
+      fn $fn_name(self, o: Self) -> Self::Output {
+        Vec3(self.0 $op o.0, self.1 $op o.1, self.2 $op o.2)
+      }
+    }
+  };
+}
+
+macro_rules! def_scalar_op {
+  ($name: ident, $fn_name: ident, $op: tt) => {
+    impl<T>$name<T> for Vec3<T> where T: $name + Copy {
+      type Output = Vec3<<T as $name>::Output>;
+      fn $fn_name(self, o: T) -> Self::Output {
+        Vec3(self.0 $op o, self.1 $op o, self.2 $op o)
+      }
+    }
+  };
+}
+
+macro_rules! def_assign_op {
+  ($name: ident, $fn_name: ident, $op: tt) => {
+    impl<T>$name for Vec3<T> where T: $name {
+      fn $fn_name(&mut self, o: Self) {
+        self.0 $op o.0;
+        self.1 $op o.1;
+        self.2 $op o.2;
+      }
+    }
+  };
+}
+
+// Define all vector-vector operations
+def_op!(Add, add, +);
+def_op!(Mul, mul, *);
+def_op!(Sub, sub, -);
+def_op!(Div, div, /);
+def_op!(Rem, rem, %);
+// Define all scalar-vector operations
+def_scalar_op!(Add, add, +);
+def_scalar_op!(Mul, mul, *);
+def_scalar_op!(Sub, sub, -);
+def_scalar_op!(Div, div, /);
+def_scalar_op!(Rem, rem, %);
+// Define all assign vector-vector operations
+def_assign_op!(AddAssign, add_assign, +=);
+def_assign_op!(SubAssign, sub_assign, -=);
+def_assign_op!(MulAssign, mul_assign, *=);
+def_assign_op!(DivAssign, div_assign, /=);
 
 #[cfg(test)]
 mod test {

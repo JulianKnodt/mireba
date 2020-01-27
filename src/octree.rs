@@ -1,104 +1,24 @@
-use crate::vec::{Ray, Vec3};
+use crate::{
+  bounds::{Bounded, Bounds},
+  vec::{Ray, Vec3},
+};
 use num::Float;
-
-/// Axis Aligned bounding box
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Bounds<Dim>([Vec3<Dim>; 2]);
-impl<D: Float> Bounds<D> {
-  /// Returns the minimum of this bounding box
-  pub fn min(&self) -> &Vec3<D> { &self.0[0] }
-  pub fn max(&self) -> &Vec3<D> { &self.0[1] }
-  /// Creates a new bound assuming that the passed vec3 are appropriately min-max
-  pub(crate) fn new(a: [Vec3<D>; 2]) -> Self {
-    assert!(a[0].0 <= a[1].0);
-    assert!(a[0].1 <= a[1].1);
-    assert!(a[0].2 <= a[1].2);
-    Bounds(a)
-  }
-  pub fn valid(a: [Vec3<D>; 2]) -> Self { Bounds([a[0].min_parts(&a[1]), a[0].max_parts(&a[1])]) }
-  /// Returns whether this bounding box contains the other.
-  /// If they have the same coordinates for one of the sides it will still return true
-  pub fn contains(&self, o: &Self) -> bool { self.max() >= o.max() && self.min() <= o.min() }
-
-  /// Returns whether edges of the other bounding box are fully contained in this one.
-  pub fn stricly_contains(&self, o: &Self) -> bool { self.max() > o.max() && self.min() < o.min() }
-  pub fn union(&self, o: &Self) -> Self {
-    Self::new([self.min().min_parts(o.min()), self.max().max_parts(o.max())])
-  }
-  /// Returns the volume inside this bounding box
-  pub fn volume(&self) -> D {
-    let &Vec3(lx, ly, lz) = self.min();
-    let &Vec3(hx, hy, hz) = self.max();
-    (hx - lx) * (hy - ly) * (hz - lz)
-  }
-  /// Returns whether this bounding box intersects this ray
-  pub fn intersects_ray(&self, r: &Ray<D>) -> bool {
-    let &Vec3(lx, ly, lz) = self.min();
-    let &Vec3(hx, hy, hz) = self.max();
-    let &Vec3(px, py, pz) = &r.pos;
-    let &Vec3(dx, dy, dz) = &r.dir;
-
-    let t = |coord, pos, dir| (coord - pos) / dir;
-    let (thx, tlx) = (t(hx, px, dx), t(lx, px, dx));
-    let (thy, tly) = (t(hy, py, dy), t(ly, py, dy));
-    let (thz, tlz) = (t(hz, pz, dz), t(lz, pz, dz));
-    let t_max = D::infinity()
-      .min(thx.max(tlx))
-      .min(thy.max(tly))
-      .min(thz.max(tlz));
-    let t_min = D::neg_infinity()
-      .max(thx.min(tlx))
-      .max(thy.min(tly))
-      .max(thz.min(tlz));
-
-    t_max > t_min.max(D::zero())
-  }
-  pub fn intersects_box(&self, o: &Self) -> bool {
-    let &Vec3(lx, ly, lz) = self.min();
-    let &Vec3(hx, hy, hz) = self.max();
-    let &Vec3(olx, oly, olz) = o.min();
-    let &Vec3(ohx, ohy, ohz) = o.max();
-    (olx > lx && olx < hx)
-      || (ohx < hx && ohx > lx) && (oly > ly && oly < hy)
-      || (ohy < hy && ohy > ly) && (olz > lz && olz < hz)
-      || (ohz < hz && ohz > lz)
-  }
-}
 
 fn octants<D: Float>(bounds: Bounds<D>) -> [Bounds<D>; 8] {
   let center = (*bounds.min() + *bounds.max()) / D::from(2.0).unwrap();
   let Vec3(cx, cy, cz) = center;
   let &Vec3(lx, ly, lz) = bounds.min();
   let &Vec3(hx, hy, hz) = bounds.max();
-  let xyz = Bounds::new([center, *bounds.max()]);
-  let nxyz = Bounds::new([Vec3(lx, cy, cz), Vec3(cx, hy, hz)]);
-  let xnyz = Bounds::new([Vec3(cx, ly, cz), Vec3(hx, cy, hz)]);
-  let xynz = Bounds::new([Vec3(cx, cy, lz), Vec3(hx, hy, cz)]);
-
-  let nxnyz = Bounds::new([Vec3(lx, ly, cz), Vec3(cx, cy, hz)]);
-  let xnynz = Bounds::new([Vec3(cx, ly, lz), Vec3(hx, cy, cz)]);
-  let nxynz = Bounds::new([Vec3(lx, cy, lz), Vec3(cx, hy, cz)]);
-  let nxnynz = Bounds::new([*bounds.min(), center]);
-  // order shouldn't matter here
-  [xyz, nxyz, xnyz, xynz, nxnyz, xnynz, nxynz, nxnynz]
-}
-
-pub trait Bounded<D> {
-  /// returns the bounds for this object
-  /// Should be relatively cheap so it can be called multiple times
-  fn bounds(&self) -> Bounds<D>;
-}
-
-impl<D: Clone> Bounded<D> for Bounds<D> {
-  fn bounds(&self) -> Bounds<D> { self.clone() }
-}
-
-impl<D: Clone> Bounded<D> for Vec3<D> {
-  fn bounds(&self) -> Bounds<D> { Bounds([self.clone(), self.clone()]) }
-}
-
-impl<D> Bounded<D> for Box<dyn Bounded<D> + '_> {
-  fn bounds(&self) -> Bounds<D> { self.as_ref().bounds() }
+  [
+    Bounds::new([center, *bounds.max()]),
+    Bounds::new([Vec3(lx, cy, cz), Vec3(cx, hy, hz)]),
+    Bounds::new([Vec3(cx, ly, cz), Vec3(hx, cy, hz)]),
+    Bounds::new([Vec3(cx, cy, lz), Vec3(hx, hy, cz)]),
+    Bounds::new([Vec3(cx, ly, lz), Vec3(hx, cy, cz)]),
+    Bounds::new([Vec3(lx, cy, lz), Vec3(cx, hy, cz)]),
+    Bounds::new([Vec3(lx, ly, cz), Vec3(cx, cy, hz)]),
+    Bounds::new([*bounds.min(), center]),
+  ]
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -116,13 +36,15 @@ impl Default for PartitionStrategy {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Octree<D, T> {
   /// The roof of this octree, that wraps all inner octree nodes.
-  root: OctreeInner<D>,
+  pub root: OctreeInner<D>,
   /// Owning storage for this octree
   backing_store: Vec<T>,
 }
 
 impl<K, T> Octree<K, T> {
   pub fn len(&self) -> usize { self.root.len() }
+  pub fn max_depth(&self) -> usize { self.root.max_depth() }
+  pub fn is_empty(&self) -> bool { self.root.len() == 0 }
   /// Iterates over the items in this octree in no particular order.
   pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
     self.root.iter().map(move |v| &self.backing_store[v])
@@ -132,7 +54,7 @@ impl<K, T> Octree<K, T> {
 impl<D: Float, B: Bounded<D>> Octree<D, B> {
   pub fn new(bounds: Bounds<D>, ps: PartitionStrategy) -> Self {
     Octree {
-      root: OctreeInner::new(&bounds, ps),
+      root: OctreeInner::new(bounds, ps),
       backing_store: vec![],
     }
   }
@@ -161,7 +83,14 @@ impl<D: Float, B: Bounded<D>> Octree<D, B> {
       .root
       .intersecting_elems(r)
       .map(move |i| &self.backing_store[i])
-      .filter(move |v| v.bounds().intersects_ray(&r))
+  }
+  /// TODO delete this temporary method that partitions the tree once
+  pub fn partition(&mut self) { self.root.partition(&self.backing_store); }
+  /// Prepares this octree for rendering
+  /// by more aggresively partition leaves.
+  pub fn prepare(&mut self) {
+    self.root.partition_aggressive(&self.backing_store);
+    self.backing_store.shrink_to_fit();
   }
 }
 
@@ -174,7 +103,7 @@ impl<D: Float, I: Bounded<D>> Extend<I> for Octree<D, I> {
   }
 }
 
-impl<D: Float, B: Bounded<D>> std::iter::FromIterator<B> for Octree<D, B> {
+impl<B: Bounded<f32>> std::iter::FromIterator<B> for Octree<f32, B> {
   fn from_iter<I: IntoIterator<Item = B>>(iter: I) -> Self {
     let backing_store = iter.into_iter().collect::<Vec<_>>();
     assert!(
@@ -187,7 +116,7 @@ impl<D: Float, B: Bounded<D>> std::iter::FromIterator<B> for Octree<D, B> {
       .skip(1)
       .fold(initial_bounds, |acc, next| acc.union(&next.bounds()));
     let mut out = Self {
-      root: OctreeInner::new(&complete_bounds, Default::default()),
+      root: OctreeInner::new(complete_bounds, Default::default()),
       backing_store,
     };
     for i in 0..out.backing_store.len() {
@@ -209,7 +138,7 @@ impl<'m, D: Float, B: Bounded<D>> From<Vec<B>> for Octree<D, B> {
       .skip(1)
       .fold(initial_bounds, |acc, next| acc.union(&next.bounds()));
     let mut out = Self {
-      root: OctreeInner::new(&complete_bounds, Default::default()),
+      root: OctreeInner::new(complete_bounds, Default::default()),
       backing_store,
     };
     for i in 0..out.backing_store.len() {
@@ -223,15 +152,27 @@ impl<'m, D: Float, B: Bounded<D>> From<Vec<B>> for Octree<D, B> {
 
 /// Octree variant specifies whether an octree node is a leaf or a partitioned node
 #[derive(Debug, Clone, PartialEq)]
-enum OctreeVariant<D> {
+pub enum OctreeVariant<D> {
   /// Holds the elements themselves
   Leaf(Vec<usize>, PartitionStrategy),
   /// Holds smaller components which themselves should contain leaves
   // TODO determine whether partitioned octree should contain items
-  Partitioned([Box<OctreeInner<D>>; 8]),
+  Partitioned(Box<[OctreeInner<D>; 8]>),
 }
 
 impl<D> OctreeVariant<D> {
+  pub fn max_depth(&self) -> usize {
+    match self {
+      OctreeVariant::Leaf(_, _) => 1,
+      OctreeVariant::Partitioned(children) =>
+        children
+          .iter()
+          .map(|child| child.max_depth())
+          .max()
+          .unwrap()
+          + 1,
+    }
+  }
   pub fn len(&self) -> usize {
     match self {
       OctreeVariant::Leaf(v, _) => v.len(),
@@ -242,15 +183,17 @@ impl<D> OctreeVariant<D> {
 
 /// OctreeInner is a node inside of the octree, that contains references to the backing store
 #[derive(Debug, Clone, PartialEq)]
-struct OctreeInner<D> {
+pub struct OctreeInner<D> {
   /// The bounds on this inner octree node
-  bounds: Bounds<D>,
+  pub bounds: Bounds<D>,
   /// What kind of octree is this inner node?
-  var: OctreeVariant<D>,
+  pub var: OctreeVariant<D>,
 }
 
 impl<D> OctreeInner<D> {
   pub fn len(&self) -> usize { self.var.len() }
+  pub fn max_depth(&self) -> usize { self.var.max_depth() }
+  pub fn bounds(&self) -> &Bounds<D> { &self.bounds }
   /// Iterates over the items in this octree in no particular order.
   pub fn iter(&self) -> Box<dyn Iterator<Item = usize> + '_> {
     match &self.var {
@@ -261,22 +204,18 @@ impl<D> OctreeInner<D> {
 }
 
 impl<D: Float> OctreeInner<D> {
-  pub fn new(bounds: &Bounds<D>, ps: PartitionStrategy) -> Self {
+  pub fn new(bounds: Bounds<D>, ps: PartitionStrategy) -> Self {
     Self {
       var: OctreeVariant::Leaf(vec![], ps),
-      bounds: *bounds,
+      bounds,
     }
   }
-  fn extend<I: IntoIterator<Item = usize>, B: Bounded<D>>(
-    &mut self,
-    iter: I,
-    backing_store: &[B],
-  ) {
+  fn extend<I: IntoIterator<Item = usize>, B: Bounded<D>>(&mut self, iter: I, items: &[B]) {
     for v in iter {
-      let bounds = backing_store[v].bounds();
-      self.add_unchecked(v, &bounds);
+      let bounds = items[v].bounds();
+      assert!(self.add_unchecked(v, &bounds));
     }
-    self.partition_recursive(&backing_store);
+    self.partition_recursive(&items);
   }
   fn partition_recursive<B: Bounded<D>>(&mut self, backing_store: &[B]) {
     match self.var {
@@ -284,34 +223,54 @@ impl<D: Float> OctreeInner<D> {
         if self.should_partition() {
           self.partition(&backing_store)
         },
+      OctreeVariant::Partitioned(ref mut children) => children
+        .iter_mut()
+        .for_each(|child| child.partition_recursive(&backing_store)),
+    };
+  }
+  /// aggressively partition this node
+  fn partition_aggressive<B: Bounded<D>>(&mut self, backing_store: &[B]) {
+    match self.var {
       OctreeVariant::Partitioned(ref mut children) =>
         return children
           .iter_mut()
-          .for_each(|child| child.partition_recursive(&backing_store)),
+          .for_each(|child| child.partition_aggressive(&backing_store)),
+      OctreeVariant::Leaf(ref idxs, _) => {
+        // volume of one partitioned node
+        let vol = self.bounds.volume() / D::from(8.0).unwrap();
+        let should_partition = idxs
+          .iter()
+          .any(|&i| backing_store[i].bounds().volume() < vol);
+        if should_partition {
+          self.partition(&backing_store);
+        } else {
+          return;
+        }
+      },
     };
+    self.partition_aggressive(&backing_store);
   }
   /// Partitions this octree into 8 iff it's a leaf
-  fn partition<B: Bounded<D>>(&mut self, backing_store: &[B]) {
+  pub fn partition<B: Bounded<D>>(&mut self, backing_store: &[B]) {
     let octants = octants(self.bounds);
     // sanity check TODO remove this once I actually test this is true
-    debug_assert!(octants.iter().all(|oct| self.bounds.contains(oct)));
+    assert!(octants.iter().all(|oct| self.bounds.contains(oct)));
     let ps = match self.var {
-      // Should this check happen earlier? It really should never occur
       OctreeVariant::Partitioned(_) => panic!("Unexpected partition of partitioned octree"),
       OctreeVariant::Leaf(_, ps) => ps,
     };
-    // is cloning the partition strategy a good approach? Probably not but it's like two unsized
-    // integers but it doesn't matter
-    let children = [
-      Box::new(OctreeInner::new(&octants[0], ps)),
-      Box::new(OctreeInner::new(&octants[1], ps)),
-      Box::new(OctreeInner::new(&octants[2], ps)),
-      Box::new(OctreeInner::new(&octants[3], ps)),
-      Box::new(OctreeInner::new(&octants[4], ps)),
-      Box::new(OctreeInner::new(&octants[5], ps)),
-      Box::new(OctreeInner::new(&octants[6], ps)),
-      Box::new(OctreeInner::new(&octants[7], ps)),
-    ];
+    // is cloning the partition strategy a good approach? It's only two unsigned
+    // integers so it likely doesn't matter
+    let children = Box::new([
+      OctreeInner::new(octants[0], ps),
+      OctreeInner::new(octants[1], ps),
+      OctreeInner::new(octants[2], ps),
+      OctreeInner::new(octants[3], ps),
+      OctreeInner::new(octants[4], ps),
+      OctreeInner::new(octants[5], ps),
+      OctreeInner::new(octants[6], ps),
+      OctreeInner::new(octants[7], ps),
+    ]);
     let out = std::mem::replace(&mut self.var, OctreeVariant::Partitioned(children));
     let mut items = if let OctreeVariant::Leaf(items, _) = out {
       items
@@ -328,19 +287,15 @@ impl<D: Float> OctreeInner<D> {
       OctreeVariant::Leaf(items, ps) => items.len() > ps.max_values,
     }
   }
-  fn add<B: Bounded<D>>(
-    &mut self,
-    idx: usize,
-    bounds: &Bounds<D>,
-    backing_store: &[B],
-  ) -> bool {
+  fn add<B: Bounded<D>>(&mut self, idx: usize, bounds: &Bounds<D>, backing_store: &[B]) -> bool {
     if !self.add_unchecked(idx, bounds) {
       return false;
     }
     match self.var {
       OctreeVariant::Partitioned(ref mut children) => children
         .iter_mut()
-        .any(|child| child.add(idx, &bounds, &backing_store)),
+        .map(|child| child.add(idx, &bounds, &backing_store))
+        .any(|b| b),
       OctreeVariant::Leaf(ref mut indeces, _) => {
         indeces.push(idx);
         if self.should_partition() {
@@ -350,22 +305,25 @@ impl<D: Float> OctreeInner<D> {
       },
     }
   }
-  // adds an item to this octree unchecked without partitioning if conditions are condition
+  /// adds an item to this octree unchecked without partitioning if conditions are condition
   fn add_unchecked(&mut self, idx: usize, bounds: &Bounds<D>) -> bool {
-    if !self.bounds.contains(bounds) {
+    if !self.bounds.intersects_box(bounds) {
       return false;
     }
     match &mut self.var {
       OctreeVariant::Partitioned(ref mut children) => children
         .iter_mut()
-        .any(|child| child.add_unchecked(idx, &bounds)),
+        .map(|child| child.add_unchecked(idx, &bounds))
+        .any(|b| b),
       OctreeVariant::Leaf(items, _) => {
         items.push(idx);
         true
       },
     }
   }
+  // TODO convert this dynamic iterator into one of a couple kinds? Is that possible here?
   fn intersecting_elems(&self, r: Ray<D>) -> Box<dyn Iterator<Item = usize> + '_> {
+    // This bounds check is incorrectly returning objects
     if !self.bounds.intersects_ray(&r) {
       return Box::new(std::iter::empty());
     };
@@ -383,7 +341,7 @@ impl<D: Float> OctreeInner<D> {
 // octree tests
 #[cfg(test)]
 mod test {
-  use super::{Bounds, Octree};
+  use super::{octants, Bounds, Octree};
   use crate::vec::Vec3;
   fn rand_bounds() -> Bounds<f32> {
     Bounds::valid([
@@ -391,11 +349,33 @@ mod test {
       Vec3(rand::random(), rand::random(), rand::random()),
     ])
   }
+  fn unit_bounds() -> Bounds<f32> { Bounds::valid([Vec3::from(0.0), Vec3::from(1.0)]) }
   #[test]
   fn build_octree() {
     // any higher is too slow for debug releases
     let n = 10000;
     let oct = (0..n).map(|_| rand_bounds()).collect::<Octree<_, _>>();
     assert_eq!(oct.len(), n);
+  }
+
+  #[test]
+  fn correct_octants() {
+    let b = unit_bounds();
+    let octs = octants(b);
+    assert!((b.volume() - octs.iter().map(|v| v.volume()).sum::<f32>()).abs() < 0.000001);
+    octs.iter().enumerate().for_each(|(i, oct1)| {
+      octs
+        .iter()
+        .enumerate()
+        .filter(|(j, _)| *j != i)
+        .for_each(|(_, oct2)| {
+          assert_ne!(oct1, oct2);
+          assert!(!oct1.strictly_contains(&oct2));
+          assert!(!oct1.intersects_box(&oct2), "{:?} {:?}", oct1, oct2);
+          assert_eq!(oct1.volume(), oct2.volume());
+        })
+    });
+    assert!(octs.iter().all(|oct| b.contains(oct)));
+    println!("{:?}", octs);
   }
 }

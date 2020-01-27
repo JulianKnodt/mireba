@@ -9,3 +9,10 @@ num = "0.2.0"
 rand = "0.7.0"
 rand_distr = "0.2.1"
 image = "0.22.3"
+ezflags = "0.1.1"
+
+[dev-dependencies]
+quickcheck = "0.9"
+
+[profile.release]
+lto = true

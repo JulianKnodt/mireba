@@ -9,12 +9,7 @@ pub struct Screen {
   data: Vec<Vec3<f32>>,
 }
 
-fn vec3_to_rgb(v: &Vec3<f32>) -> Rgb<u8> {
-  // assert!(v.0 < 256.0, "{:?}", v);
-  // assert!(v.1 < 256.0, "{:?}", v);
-  // assert!(v.2 < 256.0, "{:?}", v);
-  Rgb([v.0 as u8, v.1 as u8, v.2 as u8])
-}
+fn vec3_to_rgb(v: &Vec3<f32>) -> Rgb<u8> { Rgb([v.0 as u8, v.1 as u8, v.2 as u8]) }
 
 impl Screen {
   pub fn new(w: usize, h: usize) -> Self {

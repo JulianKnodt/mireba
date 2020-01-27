@@ -2,18 +2,18 @@ use crate::{
   vec::{Ray, Vec3},
   vis::Visibility,
 };
-use num::One;
+use num::{Float, One};
 use rand::prelude::*;
 use rand_distr::{Standard, StandardNormal};
 
-fn rand_in_unit_sphere<T>() -> Vec3<T>
+fn rand_in_unit_sphere<T: Float>() -> Vec3<T>
 where
-  T: num::Float,
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>, {
   let std = StandardNormal;
   let mut rng = thread_rng();
-  let v = Vec3(rng.sample(std), rng.sample(std), rng.sample(std)).norm(); v / rng.gen().powf(T::from(1.0 / 3.0).unwrap())
+  let v = Vec3(rng.sample(std), rng.sample(std), rng.sample(std)).norm();
+  v / rng.gen().powf(T::from(1.0 / 3.0).unwrap())
 }
 
 pub trait Material<T> {
@@ -21,30 +21,13 @@ pub trait Material<T> {
   fn scatter(&self, ray_in: &Ray<T>, vis: &Visibility<T>) -> Option<(Vec3<T>, Ray<T>)>;
 }
 
-impl<'a, T> Material<T> for &'a dyn Material<T> {
-  fn scatter(&self, ray_in: &Ray<T>, vis: &Visibility<T>) -> Option<(Vec3<T>, Ray<T>)> {
-    (*self).scatter(ray_in, vis)
-  }
-}
-
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Lambertian<T> {
   pub albedo: Vec3<T>,
 }
-impl<T> Copy for Lambertian<T> where T: Copy {}
-impl<T> Clone for Lambertian<T>
-where
-  T: Clone,
-{
-  fn clone(&self) -> Self {
-    Lambertian {
-      albedo: self.albedo.clone(),
-    }
-  }
-}
 
-impl<T> Material<T> for Lambertian<T>
+impl<T: Float> Material<T> for Lambertian<T>
 where
-  T: num::Float,
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>,
 {
@@ -53,26 +36,22 @@ where
     Some((self.albedo, Ray::new(vis.pos, target - vis.pos)))
   }
 }
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Metallic<T> {
   albedo: Vec3<T>,
   fuzz: T,
 }
-impl<T> Metallic<T>
-where
-  T: num::Float,
-{
-  pub fn new(r: T, g: T, b: T, f: T) -> Self {
+impl<T: Float> Metallic<T> {
+  pub fn new(albedo_color: Vec3<T>, fuzz: T) -> Self {
     Metallic {
-      albedo: Vec3(r, g, b),
-      fuzz: f,
+      albedo: albedo_color,
+      fuzz,
     }
   }
 }
 
-impl<T> Material<T> for Metallic<T>
+impl<T: Float> Material<T> for Metallic<T>
 where
-  T: num::Float,
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>,
 {
@@ -85,22 +64,19 @@ where
   }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Dielectric<T> {
   refract_idx: T,
 }
-fn schlick<T>(cosi: T, refr_idx: T) -> T
-where
-  T: num::Float, {
+fn schlick<T: Float>(cosi: T, refr_idx: T) -> T {
   let r0 = ((T::one() - refr_idx) / (T::one() + refr_idx)).powi(2);
   r0 + (T::one() - r0) * (T::one() - cosi).powi(5)
 }
 impl<T> Dielectric<T> {
   pub fn new(t: T) -> Self { Dielectric { refract_idx: t } }
 }
-impl<T> Material<T> for Dielectric<T>
+impl<T: Float> Material<T> for Dielectric<T>
 where
-  T: num::Float + Sync + Send,
   Standard: Distribution<T>,
 {
   fn scatter(&self, r: &Ray<T>, vis: &Visibility<T>) -> Option<(Vec3<T>, Ray<T>)> {
@@ -123,3 +99,56 @@ where
     Some((Vec3::one(), Ray::new(vis.pos, out)))
   }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Checkers {}
+impl<D: Float> Material<D> for Checkers {
+  fn scatter(&self, _: &Ray<D>, vis: &Visibility<D>) -> Option<(Vec3<D>, Ray<D>)> {
+    let f = vis.pos.floor();
+    let color = Vec3::one() * ((f.0.abs() + f.1.abs() + f.2.abs()) % D::from(2.0).unwrap());
+    Some((color, Ray::new(vis.pos, vis.norm)))
+  }
+}
+
+/// Wrapper around all valid instances of materials.
+/// Used instead of dyn material for efficiency
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mat<D = f32> {
+  Dielectric(Dielectric<D>),
+  Metallic(Metallic<D>),
+  Lambertian(Lambertian<D>),
+  Checkers(Checkers),
+}
+
+/*
+const CHECKERS: Mat = Mat::Checkers(Checkers{});
+pub const CHECKERS_REF: &'static Mat = &CHECKERS;
+*/
+
+impl<D: Float> Material<D> for Mat<D>
+where
+  Metallic<D>: Material<D>,
+  Dielectric<D>: Material<D>,
+  Lambertian<D>: Material<D>,
+{
+  fn scatter(&self, r: &Ray<D>, vis: &Visibility<D>) -> Option<(Vec3<D>, Ray<D>)> {
+    match self {
+      Mat::Dielectric(ref di) => di.scatter(r, vis),
+      Mat::Metallic(ref m) => m.scatter(r, vis),
+      Mat::Lambertian(ref l) => l.scatter(r, vis),
+      Mat::Checkers(ref c) => c.scatter(r, vis),
+    }
+  }
+}
+
+macro_rules! mat_from {
+  ($over: ty, $name: ty, $out: path) => {
+    impl<D> From<$name> for Mat<D> {
+      fn from(src: $name) -> Self { $out(src) }
+    }
+  };
+}
+mat_from!(D, Dielectric<D>, Mat::Dielectric);
+mat_from!(D, Metallic<D>, Mat::Metallic);
+mat_from!(D, Lambertian<D>, Mat::Lambertian);
+mat_from!(D, Checkers, Mat::Checkers);

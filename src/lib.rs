@@ -1,3 +1,10 @@
+// Linear algebra modules
+pub mod mat;
+pub mod vec;
+
+pub mod bounds;
+// pub mod octree2;
+
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
@@ -8,7 +15,6 @@ pub mod testing;
 pub mod timing;
 
 pub mod aabox;
-pub mod bounds;
 pub mod indexed_triangles;
 pub mod material;
 pub mod noodles;
@@ -18,5 +24,5 @@ pub mod renderable;
 pub mod screen;
 pub mod sphere;
 pub mod util;
-pub mod vec;
 pub mod vis;
+

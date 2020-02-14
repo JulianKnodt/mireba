@@ -35,7 +35,7 @@ impl<'m, T: Float> Visible<'m, T> for Sphere<'m, T> {
   fn hit(&self, r: &Ray<T>) -> Option<Visibility<'m, T>> {
     let from_sphere = r.pos - self.center;
     let a = r.dir.sqr_magn();
-    let b = T::from(2.0).unwrap() * r.dir.dot(from_sphere);
+    let b = T::from(2.0).unwrap() * r.dir.dot(&from_sphere);
     let c = from_sphere.sqr_magn() - self.radius * self.radius;
     quad_solve(a, b, c)
       .and_then(

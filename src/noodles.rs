@@ -1,10 +1,23 @@
-use crate::{material::Mat, renderable::Renderable, sphere::Sphere, vec::Vec3};
+use crate::vec::Vec3;
 use num::Float;
 
-/// A trait for outputting some set of materials
-pub trait MaterialCursor<'m> {
-  /// returns the next material and modifies the internal state.
-  fn mat(&self) -> &'m Mat<f32>;
+/// An abstract shape type used while generating which specifies local geometry of the shape
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Shape {
+  /// Sphere with a given radius
+  Sphere(f32),
+  /// Cylinder with a given radius and height. The center of its bottom circular face is the
+  /// position.
+  Cylinder { radius: f32, height: f32 },
+  /// Box with len(x), width(z), and height(y). The lower left corner of the box is the position
+  /// it takes.
+  Box { l: f32, w: f32, h: f32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ShapeInstance {
+  shape: Shape,
+  // trans: Matrix<f32>,
 }
 
 /// Current position of the noodle engine
@@ -27,25 +40,19 @@ impl<D: Float> Cursor<D> {
 // TODO figure out how to do some sort of material cursor?
 
 #[derive(Debug, PartialEq)]
-pub struct Generator<'m, M: MaterialCursor<'m>> {
+pub struct Generator {
   pub cursor: Cursor<f32>,
-  pub mat_cursor: M,
   /// Output of this generator
-  output: Vec<Renderable<'m, f32>>,
+  output: Vec<ShapeInstance>,
 }
 
-impl<'m, M: MaterialCursor<'m>> Generator<'m, M> {
+impl Generator {
   pub fn sphere(&mut self, rad: f32) {
-    let mat_ref = self.mat_cursor.mat();
-    self.output.push(Renderable::Sphere(Sphere::new(
-      self.cursor.pos,
-      rad,
-      mat_ref,
-    )));
+    todo!();
   }
 }
 
-impl<'m, M: MaterialCursor<'m>> Generator<'m, M> {
+impl Generator {
   pub fn create<F>(&mut self, f: F)
   where
     F: Fn(&mut Self), {

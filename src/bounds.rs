@@ -7,7 +7,7 @@ fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
 }
 
 /// Axis Aligned bounding box
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct Bounds<Dim>([Vec3<Dim>; 2]);
 impl<D: Float> Bounds<D> {
   /// Returns the minimum of this bounding box

@@ -116,8 +116,8 @@ where
     let half_height = (theta / T::from(2.0).unwrap()).tan();
     let half_width = half_height * aspect;
     let w = (from - at).norm();
-    let u = up.cross(w).norm();
-    let v = w.cross(u).norm();
+    let u = up.cross(&w).norm();
+    let v = w.cross(&u).norm();
     Camera {
       ll_corner: from - v * half_height - u * half_width - w,
       vert: u * half_width * T::from(2.0).unwrap(),
@@ -144,6 +144,7 @@ where
   Standard: Distribution<T>,
   V: Visible<'a, T>, {
   if let Some(mut vis) = item.hit_bounded(&r, T::from(0.001).unwrap()..T::infinity()) {
+    // return vis.norm.norm()
     vis.pos = vis.pos + vis.norm * T::from(0.00001).unwrap();
     vis
       .mat

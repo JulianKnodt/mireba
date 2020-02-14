@@ -1,4 +1,3 @@
-extern crate rand_distr;
 use num::{Float, One, Zero};
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Rem, Sub, SubAssign};
 
@@ -65,24 +64,23 @@ impl<T: One + PartialEq> One for Vec3<T> {
 impl<T: Float> Vec3<T> {
   pub fn sqr_magn(&self) -> T { self.0 * self.0 + self.1 * self.1 + self.2 * self.2 }
   pub fn magn(&self) -> T { self.sqr_magn().sqrt() }
+  /// Returns the unit vector in the same direction as this vector
   pub fn norm(&self) -> Self { (*self) / self.magn() }
-  pub fn dot(&self, o: Self) -> T { self.0 * o.0 + self.1 * o.1 + self.2 * o.2 }
+  pub fn dot(&self, o: &Self) -> T { self.0 * o.0 + self.1 * o.1 + self.2 * o.2 }
   pub fn sqrt(&self) -> Self { Vec3(self.0.sqrt(), self.1.sqrt(), self.2.sqrt()) }
   pub fn sqr_dist(&self, o: &Self) -> T { (*self - *o).sqr_magn() }
   pub fn floor(&self) -> Self { Vec3(self.0.floor(), self.1.floor(), self.2.floor()) }
-  pub fn cross(&self, o: Self) -> Self {
-    Vec3(
-      self.1 * o.2 - self.2 * o.1,
-      self.2 * o.0 - self.0 * o.2,
-      self.0 * o.1 - self.1 * o.0,
-    )
+  pub fn cross(&self, o: &Self) -> Self {
+    let &Vec3(a0, a1, a2) = self;
+    let &Vec3(o0, o1, o2) = o;
+    Vec3(a1 * o2 - a2 * o1, a2 * o0 - a0 * o2, a0 * o1 - a1 * o0)
   }
-  pub fn reflect(self, across: Vec3<T>) -> Self {
-    self - across * self.dot(across) * T::from(2.0).unwrap()
+  pub fn reflect(self, across: &Self) -> Self {
+    self - *across * self.dot(&across) * T::from(2.0).unwrap()
   }
   pub fn refract(self, norm: Vec3<T>, refract_ratio: T) -> Option<Vec3<T>> {
     let u = self.norm();
-    let dt = u.dot(norm);
+    let dt = u.dot(&norm);
     Some(T::one() - refract_ratio.powi(2) * (T::one() - dt.powi(2)))
       .filter(|discrim| discrim.is_sign_positive())
       .map(|d| (u - norm * dt) * refract_ratio - norm * d.sqrt())
@@ -93,6 +91,11 @@ impl<T: Float> Vec3<T> {
   }
   pub fn min_parts(&self, o: &Self) -> Vec3<T> {
     Vec3(self.0.min(o.0), self.1.min(o.1), self.2.min(o.2))
+  }
+  pub fn to_f32(&self) -> Vec3<f32> {
+    let &Vec3(a, b, c) = self;
+    use num::NumCast;
+    Vec3(NumCast::from(a).unwrap(), NumCast::from(b).unwrap(), NumCast::from(c).unwrap())
   }
 }
 
@@ -108,10 +111,14 @@ pub struct Ray<T = f32> {
 }
 
 impl<T> Ray<T> {
+  /// Returns a new ray with the given position and direction
   pub fn new(pos: Vec3<T>, dir: Vec3<T>) -> Self { Ray { pos, dir } }
 }
 impl<T: Float> Ray<T> {
+  /// Returns the position along a ray that corresponds to some parameter T
   pub fn at(&self, t: T) -> Vec3<T> { self.pos + self.dir * t }
+  /// Flips the direction of this ray
+  pub fn flip(&self) -> Ray<T> { Ray::new(self.pos, -self.dir) }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,6 +144,12 @@ impl<'a, T> Iterator for Iter<'a, T> {
 macro_rules! def_op {
   ($name: ident, $fn_name: ident, $op: tt) => {
     impl<T>$name for Vec3<T> where T: $name {
+      type Output = Vec3<<T as $name>::Output>;
+      fn $fn_name(self, o: Self) -> Self::Output {
+        Vec3(self.0 $op o.0, self.1 $op o.1, self.2 $op o.2)
+      }
+    }
+    impl<T: $name + Copy>$name for &Vec3<T> {
       type Output = Vec3<<T as $name>::Output>;
       fn $fn_name(self, o: Self) -> Self::Output {
         Vec3(self.0 $op o.0, self.1 $op o.1, self.2 $op o.2)

@@ -8,7 +8,7 @@ use crate::{
   octree::Octree,
   vec::{Ray, Vec3},
 };
-use num::{One, Zero};
+use num::Zero;
 use rand::prelude::*;
 use rand_distr::{Standard, StandardNormal};
 use std::ops::Range;
@@ -137,25 +137,39 @@ where
   }
 }
 
-pub fn color<'a, V, T: 'a>(r: &Ray<T>, item: &V) -> Vec3<T>
+/// Returns the color for a given ray and some visible thing
+pub fn color<'a, V, T: 'a>(r: &Ray<T>, item: &V, depth_left: usize) -> Vec3<T>
 where
   T: num::Float,
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>,
   V: Visible<'a, T>, {
-  if let Some(mut vis) = item.hit_bounded(&r, T::from(0.001).unwrap()..T::infinity()) {
-    // return vis.norm.norm()
-    vis.pos = vis.pos + vis.norm * T::from(0.00001).unwrap();
-    vis
-      .mat
-      .scatter(r, &vis)
-      .map(|(atten, bounce)| color(&bounce, item) * atten)
-      .unwrap_or_else(Vec3::one)
-  } else {
-    Vec3::lerp(
-      (r.dir.norm().1 + T::one()) * T::from(0.5).unwrap(),
-      Vec3::one(),
-      Vec3(T::from(0.5).unwrap(), T::from(0.7).unwrap(), T::one()),
-    )
-  }
+  let bg = Vec3::from(T::from(0.05).unwrap());
+  let eps = T::from(0.000001).unwrap();
+  item
+    .hit_bounded(&r, T::from(0.001).unwrap()..T::infinity())
+    .map(|mut vis| {
+      // DEBUG
+      // return vis.norm.norm()
+      vis.pos = vis.pos + vis.norm * eps;
+      let albedo = vis.mat.scatter(r, &vis);
+      let recur = if depth_left.is_zero() {
+        bg
+      } else {
+        vis
+          .mat
+          .reflected(r, &vis)
+          .map(|bounce| color(&bounce, item, depth_left - 1) * albedo)
+          .unwrap_or(bg)
+      };
+      let mut out = recur
+        + vis
+          .mat
+          .emitted(r, &vis)
+          .map(|l| l / (vis.param * vis.param))
+          .unwrap_or_else(Vec3::zero);
+      out.clamp(T::zero(), T::one());
+      out
+    })
+    .unwrap_or(bg)
 }

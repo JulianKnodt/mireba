@@ -43,11 +43,16 @@ impl<'m, 'a, T: Float> LoanedTriangle<'m, 'a, T> {
     let n1 = &self.src.norms[n1];
     let n2 = &self.src.norms[n2];
     let norm = barycentric(n0, n1, n2, at);
-    println!("{:?} {:?} {:?} {:?}", n0.to_f32(), n1.to_f32(), n2.to_f32(), norm.to_f32());
+    println!(
+      "{:?} {:?} {:?} {:?}",
+      n0.to_f32(),
+      n1.to_f32(),
+      n2.to_f32(),
+      norm.to_f32()
+    );
     norm
   }
 }
-
 
 impl<'m, 'a, T: Clone> LoanedTriangle<'m, 'a, T> {
   /// Returns the material for this triangle
@@ -103,9 +108,9 @@ impl<'m, 'a, T: Float> Visible<'m, T> for LoanedTriangle<'m, 'a, T> {
     let pos = r.at(t);
     let norm = edge_0.cross(&edge_1);
     // let norm = self
-//      .bary_normal(&pos);
-      // .map(|v| *v)
-      // .unwrap_or_else(|| edge_0.cross(&edge_1));
+    //      .bary_normal(&pos);
+    // .map(|v| *v)
+    // .unwrap_or_else(|| edge_0.cross(&edge_1));
     Some(Visibility {
       param: t,
       pos: r.at(t),
@@ -280,9 +285,9 @@ pub fn from_ascii_obj<P: AsRef<Path>, T: FromStr>(
         if fs.len() != 3 {
           todo!()
         }
-        let a = fs[0].parse::<usize>().unwrap_or_else(|_| todo!())-1;
-        let b = fs[1].parse::<usize>().unwrap_or_else(|_| todo!())-1;
-        let c = fs[2].parse::<usize>().unwrap_or_else(|_| todo!())-1;
+        let a = fs[0].parse::<usize>().unwrap_or_else(|_| todo!()) - 1;
+        let b = fs[1].parse::<usize>().unwrap_or_else(|_| todo!()) - 1;
+        let c = fs[2].parse::<usize>().unwrap_or_else(|_| todo!()) - 1;
         triangle_list.triangles.push(Vec3(a, b, c));
       },
       l => panic!("Unexpected {:?}", l),

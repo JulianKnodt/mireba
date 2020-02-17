@@ -15,7 +15,11 @@ including different objects, indexed triangle lists, and hopefully more as time 
 
 # Outputs
 
+![spheres](outputs/spheres.jpg)
+![illum_teapot](outputs/illum_teapot.jpg)
+![better_shiny_teapot](outputs/better_shiny_teapot.jpg)
+![rough_lightpot](outputs/rough_lightpot.jpg)
+![teapot](outputs/teapot.jpg)
 ![magnolia](outputs/magnolia.jpg)
 ![box](outputs/box.jpg)
-![spheres](outputs/spheres.jpg)
-![teapot](outputs/teapot.jpg)
+

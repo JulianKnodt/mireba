@@ -95,7 +95,16 @@ impl<T: Float> Vec3<T> {
   pub fn to_f32(&self) -> Vec3<f32> {
     let &Vec3(a, b, c) = self;
     use num::NumCast;
-    Vec3(NumCast::from(a).unwrap(), NumCast::from(b).unwrap(), NumCast::from(c).unwrap())
+    Vec3(
+      NumCast::from(a).unwrap(),
+      NumCast::from(b).unwrap(),
+      NumCast::from(c).unwrap(),
+    )
+  }
+  pub fn clamp(&mut self, min: T, max: T) {
+    self.0 = self.0.max(min).min(max);
+    self.1 = self.1.max(min).min(max);
+    self.2 = self.2.max(min).min(max);
   }
 }
 

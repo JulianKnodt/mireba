@@ -2,7 +2,7 @@ use crate::{
   bounds::{Bounded, Bounds},
   material::Mat,
   util::quad_solve,
-  vec::{Ray, Vec3},
+  vec::{Ray, Vec3, Vector},
   vis::{Visibility, Visible},
 };
 use num::Float;

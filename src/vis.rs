@@ -6,9 +6,9 @@ use crate::{
   indexed_triangles::IndexedTriangles,
   material::{Mat, Material},
   octree::Octree,
-  vec::{Ray, Vec3},
+  vec::{Ray, Vec3, Vector},
 };
-use num::Zero;
+use num::{traits::float::FloatConst, Float, Zero};
 use rand::prelude::*;
 use rand_distr::{Standard, StandardNormal};
 use std::ops::Range;
@@ -25,19 +25,22 @@ pub struct Visibility<'m, T> {
   pub(crate) mat: &'m Mat<T>,
 }
 
-pub trait Visible<'m, T: num::Float> {
+pub trait Visible<'m, T: Float> {
   // returns parameter T, position, and normal
+  /// Returns the visibility of this object from a given ray
   fn hit(&self, r: &Ray<T>) -> Option<Visibility<'m, T>>;
+  /// Whether or not this object is intersected in a certain range
   fn hit_bounded(&self, r: &Ray<T>, bounds: Range<T>) -> Option<Visibility<'m, T>> {
     self.hit(r).filter(|vis| bounds.contains(&vis.param))
   }
+  /// Intended to indicate whether this object is on the path of a ray.
+  /// Can be optimized to not compute normals or intersection location.
+  // TODO might need to revisit to see if the lifetime bound on the ray is ok
+  fn on_path(&self, r: &'m Ray<T>) -> bool { self.hit(r).is_some() }
 }
 
 // Checks whether a ray hits the entire set of indexed triangle
-impl<'m, T> Visible<'m, T> for IndexedTriangles<'m, T>
-where
-  T: num::Float,
-{
+impl<'m, T: Float> Visible<'m, T> for IndexedTriangles<'m, T> {
   fn hit<'a>(&'a self, r: &Ray<T>) -> Option<Visibility<'m, T>> {
     let mut curr_bound = T::zero()..T::infinity();
     self.iter().fold(None, |nearest, next| {
@@ -56,7 +59,7 @@ where
   }
 }
 
-impl<'m, D: num::Float, T: Bounded<D> + Visible<'m, D>> Visible<'m, D> for Octree<D, T> {
+impl<'m, D: Float, T: Bounded<D> + Visible<'m, D>> Visible<'m, D> for Octree<D, T> {
   fn hit(&self, r: &Ray<D>) -> Option<Visibility<'m, D>> {
     let mut curr_bound = D::zero()..D::infinity();
     self.intersecting_elements(*r).fold(None, |nearest, next| {
@@ -87,17 +90,17 @@ pub struct Camera<T> {
 
 pub fn rand_in_unit_disk<T>() -> (T, T)
 where
-  T: num::Float,
+  T: Float + FloatConst,
   Standard: Distribution<T>, {
   let mut rng = thread_rng();
   let r = rng.gen().sqrt();
-  let theta = rng.gen() * T::from(2.0 * std::f64::consts::PI).unwrap();
+  let theta = rng.gen() * T::from(2.0).unwrap() * T::PI();
   (r * theta.cos(), r * theta.sin())
 }
 
 impl<T> Camera<T>
 where
-  T: num::Float,
+  T: Float,
   Standard: Distribution<T>,
 {
   pub fn new(vert_fov_deg: T, aspect_ratio: T) -> Self {
@@ -140,12 +143,12 @@ where
 /// Returns the color for a given ray and some visible thing
 pub fn color<'a, V, T: 'a>(r: &Ray<T>, item: &V, depth_left: usize) -> Vec3<T>
 where
-  T: num::Float,
+  T: Float,
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>,
   V: Visible<'a, T>, {
   let bg = Vec3::from(T::from(0.05).unwrap());
-  let eps = T::from(0.000001).unwrap();
+  let eps = T::from(0.000_001).unwrap();
   item
     .hit_bounded(&r, T::from(0.001).unwrap()..T::infinity())
     .map(|mut vis| {

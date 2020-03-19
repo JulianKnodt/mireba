@@ -1,6 +1,7 @@
 use crate::{
   material::Mat,
-  vec::{Ray, Vec3},
+  util::triangulate,
+  vec::{Ray, Vec3, Vector},
   vis::{Visibility, Visible},
 };
 use num::Float;
@@ -42,15 +43,7 @@ impl<'m, 'a, T: Float> LoanedTriangle<'m, 'a, T> {
     let n0 = &self.src.norms[n0];
     let n1 = &self.src.norms[n1];
     let n2 = &self.src.norms[n2];
-    let norm = barycentric(n0, n1, n2, at);
-    println!(
-      "{:?} {:?} {:?} {:?}",
-      n0.to_f32(),
-      n1.to_f32(),
-      n2.to_f32(),
-      norm.to_f32()
-    );
-    norm
+    barycentric(n0, n1, n2, at)
   }
 }
 
@@ -79,7 +72,6 @@ fn barycentric<T: Float>(a: &Vec3<T>, b: &Vec3<T>, c: &Vec3<T>, p: &Vec3<T>) -> 
 // Intersection of a triangle
 impl<'m, 'a, T: Float> Visible<'m, T> for LoanedTriangle<'m, 'a, T> {
   fn hit(&self, r: &Ray<T>) -> Option<Visibility<'m, T>> {
-    let epsilon = T::from(1e-6).unwrap();
     let vert0 = *self.vert(0);
     let vert1 = *self.vert(1);
     let vert2 = *self.vert(2);
@@ -87,7 +79,7 @@ impl<'m, 'a, T: Float> Visible<'m, T> for LoanedTriangle<'m, 'a, T> {
     let edge_1 = vert2 - vert0;
     let h = r.dir.cross(&edge_1);
     let a = edge_0.dot(&h);
-    if a > -epsilon && a < epsilon {
+    if a.abs() < T::epsilon() {
       return None;
     }
     let f = a.recip();
@@ -102,10 +94,10 @@ impl<'m, 'a, T: Float> Visible<'m, T> for LoanedTriangle<'m, 'a, T> {
       return None;
     }
     let t = f * edge_1.dot(&q);
-    if !(t > epsilon && t < epsilon.recip()) {
+    if t < T::epsilon() || t > T::max_value() {
       return None;
     }
-    let pos = r.at(t);
+    // let pos = r.at(t);
     let norm = edge_0.cross(&edge_1);
     // let norm = self
     //      .bary_normal(&pos);
@@ -169,9 +161,9 @@ where
   }
 }
 
-use std::{fs::File, io::BufRead, str::FromStr};
+use std::{fs::File, io::BufRead};
 
-pub fn from_ascii_stl<P: AsRef<Path>, T: FromStr>(
+pub fn from_ascii_stl<P: AsRef<Path>, T: Float>(
   p: P,
   mat: &Mat<T>,
 ) -> io::Result<IndexedTriangles<'_, T>> {
@@ -205,17 +197,13 @@ pub fn from_ascii_stl<P: AsRef<Path>, T: FromStr>(
 
       // TODO unimplemented surface normal
       ["facet", "normal", n_i, n_j, n_k] => {
-        let n_i = n_i.parse::<T>().unwrap_or_else(|_| todo!());
-        let n_j = n_j.parse::<T>().unwrap_or_else(|_| todo!());
-        let n_k = n_k.parse::<T>().unwrap_or_else(|_| todo!());
-        triangle_list.norms.push(Vec3(n_i, n_j, n_k));
+        let norm = Vec3::<T>::from_str_radix((n_i, n_j, n_k), 10).unwrap_or_else(|_| todo!());
+        triangle_list.norms.push(norm);
       },
       ["vertex", v_i, v_j, v_k] => {
-        let v_i = v_i.parse::<T>().unwrap_or_else(|_| todo!());
-        let v_j = v_j.parse::<T>().unwrap_or_else(|_| todo!());
-        let v_k = v_k.parse::<T>().unwrap_or_else(|_| todo!());
+        let v_pos = Vec3::<T>::from_str_radix((v_i, v_j, v_k), 10).unwrap_or_else(|_| todo!());
         count += 1;
-        triangle_list.verts.push(Vec3(v_i, v_j, v_k));
+        triangle_list.verts.push(v_pos);
       },
       _ => eprintln!("Unknown line while parsing ASCII STL: {:?}", line),
     }
@@ -233,7 +221,7 @@ fn test_from_ascii_stl() {
   assert!(from_ascii_stl(p, crate::material::CHECKERS_REF).is_ok());
 }
 
-pub fn from_ascii_obj<P: AsRef<Path>, T: FromStr>(
+pub fn from_ascii_obj<P: AsRef<Path>, T: Float>(
   p: P,
   mat: &Mat<T>,
 ) -> io::Result<IndexedTriangles<'_, T>> {
@@ -254,23 +242,17 @@ pub fn from_ascii_obj<P: AsRef<Path>, T: FromStr>(
       // TODO figure out what this means
       ["g", ..] => (),
       ["v", x, y, z] => {
-        let x = x.parse::<T>().unwrap_or_else(|_| todo!());
-        let y = y.parse::<T>().unwrap_or_else(|_| todo!());
-        let z = z.parse::<T>().unwrap_or_else(|_| todo!());
-        triangle_list.verts.push(Vec3(x, y, z));
+        let pos = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| todo!());
+        triangle_list.verts.push(pos);
       },
       ["v", x, y, z, _w] => {
-        let x = x.parse::<T>().unwrap_or_else(|_| todo!());
-        let y = y.parse::<T>().unwrap_or_else(|_| todo!());
-        let z = z.parse::<T>().unwrap_or_else(|_| todo!());
-        triangle_list.verts.push(Vec3(x, y, z));
+        let pos = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| todo!());
+        triangle_list.verts.push(pos);
       },
       // Vertex normal
       ["vn", i, j, k] => {
-        let i = i.parse::<T>().unwrap_or_else(|_| todo!());
-        let j = j.parse::<T>().unwrap_or_else(|_| todo!());
-        let k = k.parse::<T>().unwrap_or_else(|_| todo!());
-        triangle_list.norms.push(Vec3(i, j, k));
+        let norm = Vec3::<T>::from_str_radix((i, j, k), 10).unwrap_or_else(|_| todo!());
+        triangle_list.norms.push(norm);
       },
       // Vertex Textures
       ["vt", _u, _v, _w] => todo!(),
@@ -281,15 +263,16 @@ pub fn from_ascii_obj<P: AsRef<Path>, T: FromStr>(
         if fs.len() < 3 {
           panic!("OBJ faces require at least 3 elements")
         }
-        // need to handle arbitrary faces by possibly making them triangles
-        if fs.len() != 3 {
-          todo!()
-        }
-        let a = fs[0].parse::<usize>().unwrap_or_else(|_| todo!()) - 1;
-        let b = fs[1].parse::<usize>().unwrap_or_else(|_| todo!()) - 1;
-        let c = fs[2].parse::<usize>().unwrap_or_else(|_| todo!()) - 1;
-        triangle_list.triangles.push(Vec3(a, b, c));
+        let vert_indeces = fs
+          .iter()
+          .map(|f| f.parse::<usize>().unwrap())
+          // 1 indexed in obj so need to subtract 1
+          .map(|f| f - 1);
+        triangulate(vert_indeces).for_each(|f| {
+          triangle_list.triangles.push(f);
+        });
       },
+      ["s", "off"] => (),
       l => panic!("Unexpected {:?}", l),
     };
   }

@@ -1,5 +1,5 @@
 use crate::{
-  vec::{Ray, Vec3},
+  vec::{Ray, Vec3, Vector},
   vis::Visibility,
 };
 use num::{Float, One, Zero};
@@ -157,8 +157,7 @@ pub struct Checkers {}
 impl<D: Float> Material<D> for Checkers {
   fn scatter(&self, _: &Ray<D>, vis: &Visibility<D>) -> Vec3<D> {
     let f = vis.pos.floor();
-    let color = Vec3::one() * ((f.0.abs() + f.1.abs() + f.2.abs()) % D::from(2.0).unwrap());
-    color
+    Vec3::one() * ((f.0.abs() + f.1.abs() + f.2.abs()) % D::from(2.0).unwrap())
   }
 }
 
@@ -176,7 +175,7 @@ pub enum Mat<D = f32> {
 
 const CHECKERS: Mat = Mat::Checkers(Checkers {});
 #[allow(unused)]
-pub const CHECKERS_REF: &'static Mat = &CHECKERS;
+pub const CHECKERS_REF: &Mat = &CHECKERS;
 
 impl<D: Float> Material<D> for Mat<D>
 where

@@ -64,11 +64,13 @@ fn main() {
   teapot.shift(Vec3(-3.0, -1.0, -40.0));
   teapot.scale(0.03);
   let items: Vec<Renderable<_>> = vec![
+    /*
     Renderable::Sphere(Sphere::new(Vec3(0.0, 0.0, -1.0), 0.5, &red_metal)),
     Renderable::Sphere(Sphere::new(Vec3(0.0, -100.5, -1.0), 100.0, &lamb)),
     Renderable::Sphere(Sphere::new(Vec3(1.0, 2.0, -1.0), 0.2, &light)),
     Renderable::Sphere(Sphere::new(Vec3(-2.0, 0.0, -1.0), 0.5, &lamb)),
-    // Renderable::IndexedTriangles(teapot),
+    */
+    Renderable::IndexedTriangles(teapot),
   ];
 
   println!("Starting to render");

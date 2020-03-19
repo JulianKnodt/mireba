@@ -3,7 +3,7 @@ use crate::{
   material::CHECKERS_REF,
   plane::Plane,
   sphere::Sphere,
-  vec::{Ray, Vec3},
+  vec::{Ray, Vec2, Vec3},
 };
 use quickcheck::{Arbitrary, Gen};
 
@@ -15,6 +15,10 @@ impl Arbitrary for Vec3<f32> {
   fn arbitrary<G: Gen>(g: &mut G) -> Self {
     Vec3(f32::arbitrary(g), f32::arbitrary(g), f32::arbitrary(g))
   }
+}
+
+impl Arbitrary for Vec2<f32> {
+  fn arbitrary<G: Gen>(g: &mut G) -> Self { Vec2(f32::arbitrary(g), f32::arbitrary(g)) }
 }
 
 impl Arbitrary for Ray<f32> {

@@ -7,7 +7,7 @@ fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
 }
 
 /// Axis Aligned bounding box
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Bounds<Dim>([Vec3<Dim>; 2]);
 impl<D: Float> Bounds<D> {
   /// Returns the minimum of this bounding box
@@ -94,13 +94,15 @@ impl<D: Float> Bounds<D> {
         t_max
       };
 
+      let l = D::one();
+      let o = D::zero();
       let norm = match t {
-        _ if t == thx => Vec3(D::one(), D::zero(), D::zero()),
-        _ if t == tlx => Vec3(-D::one(), D::zero(), D::zero()),
-        _ if t == thy => Vec3(D::zero(), D::one(), D::zero()),
-        _ if t == tly => Vec3(D::zero(), -D::one(), D::zero()),
-        _ if t == thz => Vec3(D::zero(), D::zero(), D::one()),
-        _ if t == tlz => Vec3(D::zero(), D::zero(), -D::one()),
+        _ if t == thx => Vec3(l, o, o),
+        _ if t == tlx => Vec3(-l, o, o),
+        _ if t == thy => Vec3(o, l, o),
+        _ if t == tly => Vec3(o, -l, o),
+        _ if t == thz => Vec3(o, o, l),
+        _ if t == tlz => Vec3(o, o, -l),
         _ => unreachable!(),
       };
       let norm = if t == t_max { -norm } else { norm };

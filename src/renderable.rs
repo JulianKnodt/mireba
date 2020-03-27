@@ -8,17 +8,19 @@ use crate::{
   vis::{Visibility, Visible},
 };
 use num::Float;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Renderable<'m, D> {
-  Sphere(Sphere<'m, D>),
-  AABox(AABox<'m, D>),
-  Plane(Plane<'m, D>),
-  IndexedTriangles(IndexedTriangles<'m, D>),
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Renderable<D: Float> {
+  // TODo should these references so that it can save space?
+  Sphere(Sphere<D>),
+  AABox(AABox<D>),
+  Plane(Plane<D>),
+  IndexedTriangles(IndexedTriangles<D>),
 }
 
-impl<'m, D: Float> Visible<'m, D> for Renderable<'m, D> {
-  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'m, D>> {
+impl<D: Float> Visible<D> for Renderable<D> {
+  fn hit(&self, r: &Ray<D>) -> Option<Visibility<D>> {
     match self {
       Renderable::Sphere(ref sphere) => sphere.hit(&r),
       Renderable::AABox(ref aab) => aab.hit(&r),
@@ -28,7 +30,7 @@ impl<'m, D: Float> Visible<'m, D> for Renderable<'m, D> {
   }
 }
 
-impl<'m, D: Float> Bounded<D> for Renderable<'m, D> {
+impl<D: Float> Bounded<D> for Renderable<D> {
   fn bounds(&self) -> Bounds<D> {
     match self {
       Renderable::Sphere(ref sphere) => sphere.bounds(),
@@ -41,8 +43,8 @@ impl<'m, D: Float> Bounded<D> for Renderable<'m, D> {
   }
 }
 
-impl<'a, D: Float, V: Visible<'a, D>> Visible<'a, D> for Vec<V> {
-  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'a, D>> {
+impl<D: Float, V: Visible<D>> Visible<D> for Vec<V> {
+  fn hit(&self, r: &Ray<D>) -> Option<Visibility<D>> {
     let mut curr_bound = D::zero()..D::infinity();
     self.iter().fold(None, |nearest, item| {
       match item.hit_bounded(r, curr_bound.clone()) {
@@ -59,3 +61,14 @@ impl<'a, D: Float, V: Visible<'a, D>> Visible<'a, D> for Vec<V> {
     })
   }
 }
+
+macro_rules! rend_from {
+  ($name: ty, $out: path) => {
+    impl<T: Float> From<$name> for Renderable<T> {
+      fn from(src: $name) -> Self { $out(src) }
+    }
+  };
+}
+
+rend_from!(Sphere<T>, Renderable::Sphere);
+rend_from!(Plane<T>, Renderable::Plane);

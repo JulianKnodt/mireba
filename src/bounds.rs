@@ -1,5 +1,6 @@
 use crate::vec::{Ray, Vec3};
 use num::Float;
+use serde::{Deserialize, Serialize};
 
 #[inline]
 fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
@@ -7,7 +8,7 @@ fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
 }
 
 /// Axis Aligned bounding box
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bounds<Dim>([Vec3<Dim>; 2]);
 impl<D: Float> Bounds<D> {
   /// Returns the minimum of this bounding box

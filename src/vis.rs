@@ -2,10 +2,10 @@ extern crate num;
 extern crate rand;
 extern crate rand_distr;
 use crate::{
-  bounds::Bounded,
   indexed_triangles::IndexedTriangles,
+  light::Light,
   material::{Mat, Material},
-  octree::Octree,
+  object::Object,
   vec::{Ray, Vec3, Vector},
 };
 use num::{traits::float::FloatConst, Float, Zero};
@@ -14,55 +14,34 @@ use rand_distr::{Standard, StandardNormal};
 use std::ops::Range;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Visibility<'m, T> {
+pub struct Visibility<T> {
   /// Parameter of incoming ray that this hit on
-  pub(crate) param: T,
+  pub param: T,
   /// Coordinate in world space of hit
-  pub(crate) pos: Vec3<T>,
+  pub pos: Vec3<T>,
   /// Normal to surface of hit
-  pub(crate) norm: Vec3<T>,
-  /// Material of hit
-  pub(crate) mat: &'m Mat<T>,
+  pub norm: Vec3<T>,
 }
 
-pub trait Visible<'m, T: Float> {
+pub trait Visible<T: Float> {
   // returns parameter T, position, and normal
   /// Returns the visibility of this object from a given ray
-  fn hit(&self, r: &Ray<T>) -> Option<Visibility<'m, T>>;
+  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>>;
   /// Whether or not this object is intersected in a certain range
-  fn hit_bounded(&self, r: &Ray<T>, bounds: Range<T>) -> Option<Visibility<'m, T>> {
+  fn hit_bounded(&self, r: &Ray<T>, bounds: Range<T>) -> Option<Visibility<T>> {
     self.hit(r).filter(|vis| bounds.contains(&vis.param))
   }
   /// Intended to indicate whether this object is on the path of a ray.
   /// Can be optimized to not compute normals or intersection location.
   // TODO might need to revisit to see if the lifetime bound on the ray is ok
-  fn on_path(&self, r: &'m Ray<T>) -> bool { self.hit(r).is_some() }
+  fn on_path(&self, r: &Ray<T>) -> bool { self.hit(r).is_some() }
 }
 
 // Checks whether a ray hits the entire set of indexed triangle
-impl<'m, T: Float> Visible<'m, T> for IndexedTriangles<'m, T> {
-  fn hit<'a>(&'a self, r: &Ray<T>) -> Option<Visibility<'m, T>> {
+impl<T: Float> Visible<T> for IndexedTriangles<T> {
+  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>> {
     let mut curr_bound = T::zero()..T::infinity();
     self.iter().fold(None, |nearest, next| {
-      next
-        .hit_bounded(r, curr_bound.clone())
-        .and_then(|h| match nearest {
-          None => Some(h),
-          Some(prev) if h.param > prev.param => Some(prev),
-          Some(_) => {
-            curr_bound.end = h.param;
-            Some(h)
-          },
-        })
-        .or(nearest)
-    })
-  }
-}
-
-impl<'m, D: Float, T: Bounded<D> + Visible<'m, D>> Visible<'m, D> for Octree<D, T> {
-  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'m, D>> {
-    let mut curr_bound = D::zero()..D::infinity();
-    self.intersecting_elements(*r).fold(None, |nearest, next| {
       next
         .hit_bounded(r, curr_bound.clone())
         .and_then(|h| match nearest {
@@ -141,38 +120,56 @@ where
 }
 
 /// Returns the color for a given ray and some visible thing
-pub fn color<'a, V, T: 'a>(r: &Ray<T>, item: &V, depth_left: usize) -> Vec3<T>
+pub fn color<'i, 'a, V: 'i, T: 'a + 'i, I>(
+  r: &Ray<T>,
+  items: I,
+  depth_left: usize,
+  lights: &[Light<T>],
+) -> Vec3<T>
 where
+  'a: 'i,
   T: Float,
+  I: Iterator<Item = &'i Object<&'a Mat<T>, V>> + Clone,
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>,
-  V: Visible<'a, T>, {
+  V: Visible<T>, {
   let bg = Vec3::from(T::from(0.05).unwrap());
-  let eps = T::from(0.000_001).unwrap();
-  item
-    .hit_bounded(&r, T::from(0.001).unwrap()..T::infinity())
-    .map(|mut vis| {
-      // DEBUG
-      // return vis.norm.norm()
-      vis.pos = vis.pos + vis.norm * eps;
-      let albedo = vis.mat.scatter(r, &vis);
-      let recur = if depth_left.is_zero() {
-        bg
+  let eps = T::from(1e-4).unwrap(); // T::epsilon(); // ?
+  let initial = (eps..T::infinity(), None);
+  let (_, hit) = items.clone().fold(
+    initial,
+    |(mut range, prev): (Range<T>, Option<(Visibility<T>, _)>), item| {
+      let hit = item.shape.hit_bounded(r, range.clone());
+      let hit = match (prev, hit) {
+        (v, None) => v,
+        (Some((h, p)), Some(n)) if h.param < n.param => Some((h, p)),
+        (None, Some(n)) | (Some(_), Some(n)) => {
+          range.end = n.param;
+          Some((n, item))
+        },
+      };
+      (range, hit)
+    },
+  );
+  match hit {
+    None => bg,
+    Some((mut vis, item)) => {
+      // return vis.norm.norm(); // DEBUG
+      vis.pos = vis.pos + vis.norm * (eps + eps);
+      let out_color = lights.iter().fold(Vec3::zero(), |acc: Vec3<T>, l| {
+        acc + item.mat.color(&r, &vis, &l)
+      });
+      let albedo = item.mat.albedo();
+      let recur = if depth_left == 0 || albedo.is_zero() {
+        Vec3::zero()
       } else {
-        vis
+        item
           .mat
           .reflected(r, &vis)
-          .map(|bounce| color(&bounce, item, depth_left - 1) * albedo)
-          .unwrap_or(bg)
+          .map(|bounce| color(&bounce, items, depth_left - 1, lights) * albedo)
+          .unwrap_or_else(Vec3::zero)
       };
-      let mut out = recur
-        + vis
-          .mat
-          .emitted(r, &vis)
-          .map(|l| l / (vis.param * vis.param))
-          .unwrap_or_else(Vec3::zero);
-      out.clamp(T::zero(), T::one());
-      out
-    })
-    .unwrap_or(bg)
+      out_color + recur
+    },
+  }
 }

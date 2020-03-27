@@ -1,32 +1,56 @@
 use crate::vec::{Quat, Vec2, Vec3, Vec4, Vector};
 use num::{Float, One, Zero};
+use std::ops::Range;
+
+pub trait Matrix {
+  type Field: Float;
+  type Vector: Vector<Field = Self::Field>;
+  fn det(&self) -> Self::Field;
+  fn inv(&self) -> Self;
+  fn t(&self) -> Self;
+  fn vecmul(&self, v: &Self::Vector) -> Self::Vector;
+  fn matmul(&self, o: &Self) -> Self;
+}
 
 /// A 3x3 Matrix type
-// each vector represents a column
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Matrix3<T>([Vec3<T>; 3]);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Matrix2<T>([Vec2<T>; 2]);
-
-impl<T: Float> Matrix2<T> {
-  pub fn vecmul(&self, v: &Vec2<T>) -> Vec2<T> {
-    let &Matrix2([c0, c1]) = self;
-    c0 * v.0 + c1 * v.1
+impl<T: Float> Matrix for Matrix3<T> {
+  type Field = T;
+  type Vector = Vec3<Self::Field>;
+  /// Computes the determinant of this matrix
+  fn det(&self) -> T {
+    let &Matrix3([Vec3(e00, e01, e02), Vec3(e10, e11, e12), Vec3(e20, e21, e22)]) = self;
+    e00 * e11 * e22 +
+    e01 * e12 * e20 +
+    e02 * e10 * e21 -
+    // subtraction
+    e02 * e11 * e20 -
+    e01 * e10 * e22 -
+    e00 * e12 * e21
   }
-  pub fn matmul(&self, o: &Self) -> Self {
-    let &Matrix2([c0, c1]) = o;
-    Matrix2([self.vecmul(&c0), self.vecmul(&c1)])
+  /// Basic vector multiplication by a vector
+  fn vecmul(&self, o: &Vec3<T>) -> Vec3<T> {
+    let &Matrix3([c0, c1, c2]) = self;
+    let &Vec3(x, y, z) = o;
+    c0 * x + c1 * y + c2 * z
   }
-  /// Returns the rotation matrix given a theta in the counterclockwise direction
-  pub fn rot(theta: T) -> Self {
-    let (sin_t, cos_t) = theta.sin_cos();
-    Matrix2([Vec2(cos_t, sin_t), Vec2(-sin_t, cos_t)])
+  /// Inverts this matrix, does not handle non-invertible matrices
+  fn inv(&self) -> Self { self.t() / self.det() }
+  /// returns the matrix multiplication of this matrix and another one
+  fn matmul(&self, o: &Self) -> Self {
+    let &Matrix3([c0, c1, c2]) = o;
+    Matrix3([self.vecmul(&c0), self.vecmul(&c1), self.vecmul(&c2)])
   }
-  /// Returns the scale matrix given scale in each direction
-  pub fn scale(sx: T, sy: T) -> Self {
-    let o = T::zero();
-    Matrix2([Vec2(sx, o), Vec2(o, sy)])
+  /// transposes the matrix
+  fn t(&self) -> Self {
+    let &Matrix3([Vec3(e00, e01, e02), Vec3(e10, e11, e12), Vec3(e20, e21, e22)]) = self;
+    Matrix3([
+      Vec3(e00, e10, e20),
+      Vec3(e01, e11, e21),
+      Vec3(e02, e12, e22),
+    ])
   }
 }
 
@@ -80,28 +104,6 @@ impl<T: Float> From<Quat<T>> for Matrix3<T> {
 }
 
 impl<T: Float> Matrix3<T> {
-  /// Computes the determinant of this matrix
-  pub fn det(&self) -> T {
-    let &Matrix3([Vec3(e00, e01, e02), Vec3(e10, e11, e12), Vec3(e20, e21, e22)]) = self;
-    e00 * e11 * e22 +
-    e01 * e12 * e20 +
-    e02 * e10 * e21 -
-    // subtraction
-    e02 * e11 * e20 -
-    e01 * e10 * e22 -
-    e00 * e12 * e21
-  }
-  /// Basic vector multiplication by a vector
-  pub fn vecmul(&self, o: &Vec3<T>) -> Vec3<T> {
-    let &Matrix3([c0, c1, c2]) = self;
-    let &Vec3(x, y, z) = o;
-    c0 * x + c1 * y + c2 * z
-  }
-  /// returns the matrix multiplication of this matrix and another one
-  pub fn matmul(&self, o: &Self) -> Self {
-    let &Matrix3([c0, c1, c2]) = o;
-    Matrix3([self.vecmul(&c0), self.vecmul(&c1), self.vecmul(&c2)])
-  }
   /// Returns the main diagonal along this matrix
   pub fn diag(&self) -> Vec3<T> {
     let &Matrix3([Vec3(e00, _, _), Vec3(_, e11, _), Vec3(_, _, e22)]) = self;
@@ -111,15 +113,6 @@ impl<T: Float> Matrix3<T> {
   pub fn trace(&self) -> T {
     let Vec3(e00, e11, e22) = self.diag();
     e00 + e11 + e22
-  }
-  /// transposes the matrix
-  pub fn t(&self) -> Self {
-    let &Matrix3([Vec3(e00, e01, e02), Vec3(e10, e11, e12), Vec3(e20, e21, e22)]) = self;
-    Matrix3([
-      Vec3(e00, e10, e20),
-      Vec3(e01, e11, e21),
-      Vec3(e02, e12, e22),
-    ])
   }
   pub fn rot(around: &Vec3<T>, cos_t: T) -> Self {
     let &Vec3(i, j, k) = around;
@@ -175,8 +168,53 @@ impl<T: Float> Matrix3<T> {
   }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Matrix2<T>([Vec2<T>; 2]);
+
+impl<T: Float> Matrix for Matrix2<T> {
+  type Field = T;
+  type Vector = Vec2<Self::Field>;
+  /// Computes the determinant of this matrix
+  fn det(&self) -> Self::Field {
+    let &Matrix2([Vec2(e00, e01), Vec2(e10, e11)]) = self;
+    e00 * e11 - e01 * e10
+  }
+  /// Inverts this matrix, does not handle non-invertible matrices
+  fn inv(&self) -> Self {
+    let det = self.det();
+    let &Matrix2([Vec2(e00, e01), Vec2(e10, e11)]) = self;
+    Matrix2([Vec2(e11, -e01), Vec2(-e10, e00)]) / det
+  }
+  /// transposes the matrix
+  fn t(&self) -> Self {
+    let &Matrix2([Vec2(e00, e01), Vec2(e10, e11)]) = self;
+    Matrix2([Vec2(e00, e10), Vec2(e01, e11)])
+  }
+  fn vecmul(&self, v: &Vec2<T>) -> Vec2<T> {
+    let &Matrix2([c0, c1]) = self;
+    c0 * v.0 + c1 * v.1
+  }
+  fn matmul(&self, o: &Self) -> Self {
+    let &Matrix2([c0, c1]) = o;
+    Matrix2([self.vecmul(&c0), self.vecmul(&c1)])
+  }
+}
+
+impl<T: Float> Matrix2<T> {
+  /// Returns the rotation matrix given a theta in the counterclockwise direction
+  pub fn rot(theta: T) -> Self {
+    let (sin_t, cos_t) = theta.sin_cos();
+    Matrix2([Vec2(cos_t, sin_t), Vec2(-sin_t, cos_t)])
+  }
+  /// Returns the scale matrix given scale in each direction
+  pub fn scale(sx: T, sy: T) -> Self {
+    let o = T::zero();
+    Matrix2([Vec2(sx, o), Vec2(o, sy)])
+  }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Matrix4<T>([Vec4<T>; 4]);
+pub struct Matrix4<T>(pub [Vec4<T>; 4]);
 
 impl<T: Zero + Copy> Zero for Matrix4<T> {
   fn zero() -> Self { Self([Vec4::zero(); 4]) }
@@ -205,28 +243,125 @@ impl<T: One + Zero + Copy + PartialEq> One for Matrix4<T> {
   }
 }
 
-impl<T: Float> Matrix4<T> {
-  pub fn vecmul(&self, o: &Vec4<T>) -> Vec4<T> {
+impl<T> Matrix4<T> {
+  pub const N: usize = 4;
+  /*
+  fn row(&self, r: usize) -> Vec4<T> {
     let &Matrix4([c1, c2, c3, c4]) = self;
-    let &Vec4([a, b, c, d]) = o;
-    c1 * a + c2 * b + c3 * c + c4 * d
+    Vec4([c1[r], c2[r], c3[r], c4[r]])
   }
-  /// Implement matrix multiplication
-  pub fn matmul(&self, o: &Self) -> Self {
-    let Matrix4([a, b, c, d]) = o;
+  */
+  /// Swaps rows within a set of columns for this matrix
+  pub fn swap_rows(&mut self, cols: Range<usize>, a: usize, b: usize) {
+    self.0[cols].iter_mut().for_each(|c| c.0.swap(a, b));
+  }
+}
+
+impl<T: Copy> Matrix4<T> {
+  pub fn apply_fn<F, S>(&self, f: F) -> Matrix4<S>
+  where
+    F: Fn(T) -> S + Copy, {
+    let &Matrix4([c0, c1, c2, c3]) = self;
     Matrix4([
-      self.vecmul(a),
-      self.vecmul(b),
-      self.vecmul(c),
-      self.vecmul(d),
+      c0.apply_fn(f),
+      c1.apply_fn(f),
+      c2.apply_fn(f),
+      c3.apply_fn(f),
     ])
   }
+}
+
+/// Computes the argmax over a slice of floats assuming it is non-empty
+fn argmax<T: Float>(v: &[T]) -> usize {
+  assert!(!v.is_empty());
+  v.iter()
+    .enumerate()
+    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+    .unwrap()
+    .0
+}
+
+impl<T: Float> Matrix4<T> {
   /// Returns a translation matrix by t
   pub fn translate(t: Vec3<T>) -> Self {
     let mut out = Matrix4::one();
     out.0[3] = t.into();
     out
   }
+  /// LUP decomposes self into lower triangular, upper triangular and pivot matrix
+  // TODO this actually is pretty easily made generic so eventually need to do that
+  pub fn lup(&self) -> (Self, Self, Self) {
+    let mut l = Self::one();
+    let mut u = *self;
+    let mut p = Self::one();
+    for k in 0..(Self::N - 1) {
+      let i = k + argmax(&u.0[k].apply_fn(T::abs).0[k..]);
+      u.swap_rows(k..Self::N, i, k);
+      l.swap_rows(0..k, i, k);
+      p.swap_rows(0..Self::N, i, k);
+      for j in (k + 1)..Self::N {
+        l.0[k][j] = u.0[k][j] / u.0[k][k];
+        for i in k..Self::N {
+          u.0[i][j] = u.0[i][j] - l.0[k][j] * u.0[i][k];
+        }
+      }
+    }
+    (l, u, p)
+  }
+  /// Given an upper triangular matrix and a vector, compute the solution to the system of
+  /// equations
+  pub fn usolve(&self, b: &Vec4<T>) -> Vec4<T> {
+    let &Matrix4(
+      [Vec4([e00, _, _, _]), Vec4([e10, e11, _, _]), Vec4([e20, e21, e22, _]), Vec4([e30, e31, e32, e33])],
+    ) = self;
+    let &Vec4([b0, b1, b2, b3]) = b;
+    let l = b3 / e33;
+    let k = (b2 - l * e32) / e22;
+    let j = (b1 - k * e21 - l * e31) / e11;
+    let i = (b0 - j * e10 - k * e20 - l * e30) / e00;
+    Vec4([i, j, k, l])
+  }
+  /// Given a lower triangular matrix and a vector, compute the solution to the system of
+  /// equations
+  pub fn lsolve(&self, b: &Vec4<T>) -> Vec4<T> {
+    let &Matrix4(
+      [Vec4([e00, e10, e20, e30]), Vec4([_, e11, e21, e31]), Vec4([_, _, e22, e32]), Vec4([_, _, _, e33])],
+    ) = self;
+    let &Vec4([b0, b1, b2, b3]) = b;
+    let i = b0 / e00;
+    let j = (b1 - i * e10) / e11;
+    let k = (b2 - i * e20 - j * e21) / e22;
+    let l = (b3 - i * e30 - j * e31 - k * e32) / e33;
+    Vec4([i, j, k, l])
+  }
+  /// Solves for x in the linear system Ax = b;
+  pub fn solve(lup: &(Self, Self, Self), b: &Vec4<T>) -> Vec4<T> {
+    let (l, u, p) = lup;
+    let b = p.vecmul(b);
+    u.usolve(&l.lsolve(&b))
+  }
+}
+
+#[test]
+fn test_lu_decomp() {
+  let a: Matrix4<f32> = Matrix4([
+    Vec4([3., -3., 6., -9.]),
+    Vec4([-7., 5., 1., 0.]),
+    Vec4([6., -4., 0., -5.]),
+    Vec4([-9., 5., -5., 12.]),
+  ]);
+  let lup = a.lup();
+  let (l, u, p) = lup;
+  let out = p.t().matmul(&l.matmul(&u));
+  for i in 0..Matrix4::<f32>::N {
+    for j in 0..Matrix4::<f32>::N {
+      assert!((a.0[i][j] - out.0[i][j]).abs() < f32::epsilon());
+    }
+  }
+  let x = Vec4([3.0, 0.0, 1.2, 4.5]);
+  let b = a.vecmul(&x);
+  let x_p = Matrix4::solve(&lup, &b);
+  assert!((x_p - x).sqr_magn() < 0.00001);
 }
 
 /// Extends a 3x3 matrix such that it has a 4th column with last element 1.
@@ -238,6 +373,41 @@ impl<T: One + Zero> From<Matrix3<T>> for Matrix4<T> {
       b.extend(T::zero()),
       c.extend(T::zero()),
       Vec4::basis(3),
+    ])
+  }
+}
+
+impl<T: Float> Matrix for Matrix4<T> {
+  type Field = T;
+  type Vector = Vec4<Self::Field>;
+  /// Computes the determinant of this matrix
+  fn det(&self) -> T { todo!() }
+  fn inv(&self) -> Self { todo!() }
+  /// transposes the matrix
+  fn t(&self) -> Self {
+    let &Matrix4(
+      [Vec4([e00, e01, e02, e03]), Vec4([e10, e11, e12, e13]), Vec4([e20, e21, e22, e23]), Vec4([e30, e31, e32, e33])],
+    ) = self;
+    Matrix4([
+      Vec4([e00, e10, e20, e30]),
+      Vec4([e01, e11, e21, e31]),
+      Vec4([e02, e12, e22, e32]),
+      Vec4([e03, e13, e23, e33]),
+    ])
+  }
+  fn vecmul(&self, o: &Vec4<T>) -> Vec4<T> {
+    let &Matrix4([c1, c2, c3, c4]) = self;
+    let &Vec4([a, b, c, d]) = o;
+    c1 * a + c2 * b + c3 * c + c4 * d
+  }
+  /// Implement matrix multiplication
+  fn matmul(&self, o: &Self) -> Self {
+    let Matrix4([a, b, c, d]) = o;
+    Matrix4([
+      self.vecmul(a),
+      self.vecmul(b),
+      self.vecmul(c),
+      self.vecmul(d),
     ])
   }
 }

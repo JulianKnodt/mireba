@@ -1,27 +1,22 @@
 use crate::{
   bounds::{Bounded, Bounds},
-  material::Mat,
   util::quad_solve,
   vec::{Ray, Vec3, Vector},
   vis::{Visibility, Visible},
 };
 use num::Float;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Sphere<'a, T> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Sphere<T> {
   center: Vec3<T>,
   radius: T,
-  mat: &'a Mat<T>,
 }
 
-impl<'m, T: Float> Sphere<'m, T> {
-  pub fn new(center: Vec3<T>, radius: T, mat: &'m Mat<T>) -> Self {
+impl<T: Float> Sphere<T> {
+  pub fn new(center: Vec3<T>, radius: T) -> Self {
     assert!(radius.is_sign_positive());
-    Self {
-      center,
-      radius,
-      mat,
-    }
+    Self { center, radius }
   }
   #[inline]
   fn normal(&self, v: Vec3<T>) -> Vec3<T> { v - self.center }
@@ -31,8 +26,8 @@ impl<'m, T: Float> Sphere<'m, T> {
   }
 }
 
-impl<'m, T: Float> Visible<'m, T> for Sphere<'m, T> {
-  fn hit(&self, r: &Ray<T>) -> Option<Visibility<'m, T>> {
+impl<T: Float> Visible<T> for Sphere<T> {
+  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>> {
     let from_sphere = r.pos - self.center;
     let a = r.dir.sqr_magn();
     let b = T::from(2.0).unwrap() * r.dir.dot(&from_sphere);
@@ -52,13 +47,12 @@ impl<'m, T: Float> Visible<'m, T> for Sphere<'m, T> {
           param: t,
           pos,
           norm: self.normal(pos),
-          mat: self.mat,
         }
       })
   }
 }
 
-impl<D: Float> Bounded<D> for Sphere<'_, D> {
+impl<D: Float> Bounded<D> for Sphere<D> {
   fn bounds(&self) -> Bounds<D> {
     let min = self.center - self.radius;
     let max = self.center + self.radius;
@@ -73,7 +67,7 @@ mod test_sphere {
   use quickcheck::TestResult;
   quickcheck! {
     // tests that a ray with a t inside the sphere actually hit it
-    fn inside_sphere(r: Ray<f32>, t: f32, sphere: Sphere<'static, f32>) -> TestResult {
+    fn inside_sphere(r: Ray<f32>, t: f32, sphere: Sphere<f32>) -> TestResult {
       if t.is_sign_negative() { return TestResult::discard() };
       let inside = sphere.contains(&r.at(t));
       if !inside { return TestResult::discard() }

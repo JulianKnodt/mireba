@@ -1,0 +1,1 @@
+{"materials":[{"Lambertian":{"albedo":[0.7,0.3,0.2]}},{"Metallic":{"albedo":[1.0,1.0,1.0],"fuzz":0.25}},{"Dielectric":{"refract_idx":1.5,"refract_color":[0.5,0.0,0.0]}}],"objects":[{"mat":0,"shape":{"Sphere":{"center":[0.0,0.0,-1.0],"radius":1.0}}}],"lights":[{"Point":{"pos":[10.0,10.0,-10.0],"intensity":1.0,"attenuation":[0.0,0.0,1.0],"color":[1.0,1.0,1.0]}}]}

@@ -1,27 +1,30 @@
 use crate::{
-  material::Mat,
   vec::{Ray, Vec3, Vector},
   vis::{Visibility, Visible},
 };
 use num::Float;
+use serde::{Deserialize, Serialize};
 
 /// Represents a plane in 3d space
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Plane<'m, D> {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Plane<D> {
   /// Normal to the plane
   normal: Vec3<D>,
   /// Offset of the plane from the origin
   w: D,
-  mat: &'m Mat<D>,
 }
 
-impl<'m, D: Float> Plane<'m, D> {
-  pub fn new(normal: Vec3<D>, w: D, mat: &'m Mat<D>) -> Self { Self { normal, w, mat } }
+impl<D: Float> Plane<D> {
+  pub fn new(normal: Vec3<D>, w: D) -> Self { Self { normal, w } }
 }
 
-impl<'m, D: Float> Visible<'m, D> for Plane<'m, D> {
-  fn hit(&self, r: &Ray<D>) -> Option<Visibility<'m, D>> {
-    let param = -(r.pos.dot(&self.normal) + self.w) / self.normal.dot(&r.dir);
+impl<D: Float> Visible<D> for Plane<D> {
+  fn hit(&self, r: &Ray<D>) -> Option<Visibility<D>> {
+    let d = self.normal.dot(&r.dir);
+    if d.is_zero() {
+      return None;
+    }
+    let param = -(r.pos.dot(&self.normal) + self.w) / d;
     if param.is_sign_negative() {
       return None;
     }
@@ -30,12 +33,10 @@ impl<'m, D: Float> Visible<'m, D> for Plane<'m, D> {
       pos,
       param,
       norm: self.normal,
-      mat: self.mat,
     })
   }
 }
 
-/*
 // TODO fix flaky test
 #[cfg(test)]
 mod test_plane {
@@ -52,4 +53,3 @@ mod test_plane {
     }
   }
 }
-*/

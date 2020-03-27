@@ -1,14 +1,17 @@
 use crate::{
-  material::Mat,
   util::triangulate,
   vec::{Ray, Vec3, Vector},
   vis::{Visibility, Visible},
 };
 use num::Float;
-use std::{io, path::Path};
+use serde::{
+  de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor},
+  ser::{Serialize, SerializeStruct, Serializer},
+};
+use std::{ffi::OsString, io, path::Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IndexedTriangles<'m, D> {
+pub struct IndexedTriangles<D> {
   /// list of vertices
   verts: Vec<Vec3<D>>,
   /// list of normals
@@ -17,16 +20,17 @@ pub struct IndexedTriangles<'m, D> {
   // list of indeces triangles
   triangles: Vec<Vec3<usize>>,
 
-  mat: &'m Mat<D>,
+  /// Which file did this come from?
+  src_file: OsString,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct LoanedTriangle<'m, 'a, T> {
-  pub(crate) src: &'a IndexedTriangles<'m, T>,
+pub struct LoanedTriangle<'a, T> {
+  pub(crate) src: &'a IndexedTriangles<T>,
   pub(crate) n: usize,
 }
 
-impl<'m, 'a, T> LoanedTriangle<'m, 'a, T> {
+impl<'a, T> LoanedTriangle<'a, T> {
   pub fn vert(&self, n: u8) -> &'a Vec3<T> {
     assert!(n < 3);
     &self.src.verts[*self.src.triangles[self.n].nth(n)]
@@ -37,7 +41,7 @@ impl<'m, 'a, T> LoanedTriangle<'m, 'a, T> {
   }
 }
 
-impl<'m, 'a, T: Float> LoanedTriangle<'m, 'a, T> {
+impl<'a, T: Float> LoanedTriangle<'a, T> {
   pub fn bary_normal(&self, at: &Vec3<T>) -> Vec3<T> {
     let Vec3(n0, n1, n2) = self.src.triangles[self.n];
     let n0 = &self.src.norms[n0];
@@ -45,12 +49,6 @@ impl<'m, 'a, T: Float> LoanedTriangle<'m, 'a, T> {
     let n2 = &self.src.norms[n2];
     barycentric(n0, n1, n2, at)
   }
-}
-
-impl<'m, 'a, T: Clone> LoanedTriangle<'m, 'a, T> {
-  /// Returns the material for this triangle
-  #[inline]
-  pub fn mat(&self) -> &'m Mat<T> { self.src.mat }
 }
 
 fn barycentric<T: Float>(a: &Vec3<T>, b: &Vec3<T>, c: &Vec3<T>, p: &Vec3<T>) -> Vec3<T> {
@@ -70,8 +68,8 @@ fn barycentric<T: Float>(a: &Vec3<T>, b: &Vec3<T>, c: &Vec3<T>, p: &Vec3<T>) -> 
 }
 
 // Intersection of a triangle
-impl<'m, 'a, T: Float> Visible<'m, T> for LoanedTriangle<'m, 'a, T> {
-  fn hit(&self, r: &Ray<T>) -> Option<Visibility<'m, T>> {
+impl<'a, T: Float> Visible<T> for LoanedTriangle<'a, T> {
+  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>> {
     let vert0 = *self.vert(0);
     let vert1 = *self.vert(1);
     let vert2 = *self.vert(2);
@@ -107,24 +105,23 @@ impl<'m, 'a, T: Float> Visible<'m, T> for LoanedTriangle<'m, 'a, T> {
       param: t,
       pos: r.at(t),
       norm,
-      mat: self.mat(),
     })
   }
 }
 
-impl<'m, T> IndexedTriangles<'m, T> {
+impl<T> IndexedTriangles<T> {
   pub fn len(&self) -> usize { self.triangles.len() }
   pub fn is_empty(&self) -> bool { self.triangles.is_empty() }
-  pub fn iter(&self) -> Iter<'m, '_, T> {
+  pub fn iter(&self) -> Iter<'_, T> {
     Iter {
       triangle_list: self,
       curr: 0,
     }
   }
-  pub fn triangle(&self, n: usize) -> LoanedTriangle<'m, '_, T> { LoanedTriangle { src: self, n } }
+  pub fn triangle(&self, n: usize) -> LoanedTriangle<'_, T> { LoanedTriangle { src: self, n } }
 }
 
-impl<'m, T: Float> IndexedTriangles<'m, T> {
+impl<T: Float> IndexedTriangles<T> {
   pub fn shift(&mut self, xyz: Vec3<T>) {
     self.verts.iter_mut().for_each(|vert| {
       vert.0 = vert.0 + xyz.0;
@@ -141,16 +138,16 @@ impl<'m, T: Float> IndexedTriangles<'m, T> {
   }
 }
 
-pub struct Iter<'m, 'a, T> {
-  triangle_list: &'a IndexedTriangles<'m, T>,
+pub struct Iter<'a, T> {
+  triangle_list: &'a IndexedTriangles<T>,
   curr: usize,
 }
 
-impl<'m, 'a, T> Iterator for Iter<'m, 'a, T>
+impl<'a, T> Iterator for Iter<'a, T>
 where
   T: Clone,
 {
-  type Item = LoanedTriangle<'m, 'a, T>;
+  type Item = LoanedTriangle<'a, T>;
   fn next(&mut self) -> Option<Self::Item> {
     if self.curr == self.triangle_list.len() {
       return None;
@@ -163,17 +160,14 @@ where
 
 use std::{fs::File, io::BufRead};
 
-pub fn from_ascii_stl<P: AsRef<Path>, T: Float>(
-  p: P,
-  mat: &Mat<T>,
-) -> io::Result<IndexedTriangles<'_, T>> {
-  let f = File::open(p)?;
+pub fn from_ascii_stl<P: AsRef<Path>, T: Float>(p: P) -> io::Result<IndexedTriangles<T>> {
+  let f = File::open(p.as_ref())?;
   let buf = io::BufReader::new(f);
   let mut triangle_list: IndexedTriangles<T> = IndexedTriangles {
     verts: vec![],
     triangles: vec![],
     norms: vec![],
-    mat,
+    src_file: p.as_ref().as_os_str().to_os_string(),
   };
   let mut count = 0;
   let mut starting_index = 0;
@@ -221,17 +215,14 @@ fn test_from_ascii_stl() {
   assert!(from_ascii_stl(p, crate::material::CHECKERS_REF).is_ok());
 }
 
-pub fn from_ascii_obj<P: AsRef<Path>, T: Float>(
-  p: P,
-  mat: &Mat<T>,
-) -> io::Result<IndexedTriangles<'_, T>> {
-  let f = File::open(p)?;
+pub fn from_ascii_obj<P: AsRef<Path>, T: Float>(p: P) -> io::Result<IndexedTriangles<T>> {
+  let f = File::open(p.as_ref())?;
   let buf = io::BufReader::new(f);
   let mut triangle_list = IndexedTriangles {
     verts: vec![],
     triangles: vec![],
     norms: vec![],
-    mat,
+    src_file: p.as_ref().as_os_str().to_os_string(),
   };
   for line in buf.lines() {
     let line = line?;
@@ -279,6 +270,61 @@ pub fn from_ascii_obj<P: AsRef<Path>, T: Float>(
   Ok(triangle_list)
 }
 
+impl<D> Serialize for IndexedTriangles<D> {
+  fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    let mut state = serializer.serialize_struct("IndexedTriangles", 1)?;
+    state.serialize_field("src_file", &self.src_file)?;
+    state.end()
+  }
+}
+
+use std::fmt;
+impl<'de, T: Float> Deserialize<'de> for IndexedTriangles<T> {
+  fn deserialize<D: Deserializer<'de>>(des: D) -> Result<Self, D::Error> {
+    use std::marker::PhantomData;
+    #[derive(Debug, serde::Deserialize)]
+    enum Field {
+      #[serde(rename = "src_file")]
+      SrcFile,
+    }
+    struct ITVisitor<F>(PhantomData<F>);
+    impl<'de, F: Float> Visitor<'de> for ITVisitor<F> {
+      type Value = IndexedTriangles<F>;
+      fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("struct IndexedTrianges")
+      }
+      fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<Self::Value, V::Error> {
+        let p: OsString = seq
+          .next_element()?
+          .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+        let idt = match Path::new(&p).extension() {
+          None => panic!("No extension, cannot render"),
+          Some(stl) if stl == "stl" => from_ascii_stl(stl),
+          Some(obj) if obj == "obj" => from_ascii_obj(p),
+          v => panic!("Invalid extension {:?}", v),
+        };
+        Ok(idt.unwrap())
+      }
+      fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<Self::Value, V::Error> {
+        let p: OsString = if let Some(Field::SrcFile) = map.next_key::<Field>()? {
+          map.next_value()?
+        } else {
+          return Err(de::Error::missing_field("src_file"));
+        };
+        let idt = match Path::new(&p).extension() {
+          None => panic!("No extension, cannot render"),
+          Some(stl) if stl == "stl" => from_ascii_stl(stl),
+          Some(obj) if obj == "obj" => from_ascii_obj(p),
+          v => panic!("Invalid extension {:?}", v),
+        };
+        Ok(idt.unwrap())
+      }
+    }
+    const FIELDS: &'static [&'static str] = &["src_file"];
+    des.deserialize_struct("IndexedTriangles", FIELDS, ITVisitor(PhantomData))
+  }
+}
+
 #[test]
 fn test_from_ascii_obj() {
   let p = Path::new(file!())
@@ -286,5 +332,5 @@ fn test_from_ascii_obj() {
     .unwrap()
     .join("sample_files")
     .join("teapot.obj");
-  assert!(from_ascii_obj(p, crate::material::CHECKERS_REF).is_ok());
+  assert!(from_ascii_obj(p).is_ok());
 }

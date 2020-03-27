@@ -1,7 +1,7 @@
+use crate::mat::{Matrix, Matrix2, Matrix3};
 /// Defines computation and application of operators
 /// over various vector types.
 use crate::vec::{Quat, Vec2, Vec3, Vector};
-use crate::mat::{Matrix2, Matrix3};
 use num::Float;
 
 /// Computes the mapping on some type by some operator
@@ -71,7 +71,7 @@ mod map_tests {
   use super::Map;
   use crate::{
     mat::Matrix2,
-    vec::{Vec2, Vec3, Quat, Vector},
+    vec::{Quat, Vec2, Vec3, Vector},
   };
   use quickcheck::TestResult;
   #[test]

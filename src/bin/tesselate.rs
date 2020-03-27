@@ -5,7 +5,7 @@ extern crate rand;
 
 use ezflags::flag::FlagSet;
 use ray_weekend::{
-  color::Color, lgram::LGrammar, map::Map, screen::Screen, turtle::Turtle, util::unitize_2d,
+  color::RGB, lgram::LGrammar, map::Map, screen::Screen, turtle::Turtle, util::unitize_2d,
   vec::Vec2,
 };
 use std::f32::consts::PI;
@@ -24,7 +24,7 @@ fn main() {
   let mut screen = Screen::new(w as usize, h as usize);
   let y_offset = Vec2(1.0, 50.0);
   let x_offset = Vec2(50.0, 5.0);
-  screen.fill(Color::tone(1.0).val());
+  screen.fill(RGB::tone(1.0).val());
   let mut turtle: Turtle<f32, _> = Turtle::at(Vec2(-100f32, -100f32), Vec2(0.0, 1.0));
   let x_vecs = vec![Vec2(0.3, 1.5), Vec2(1.0, 0.2), Vec2(0.5, -0.3)];
   let op = unitize_2d(&x_vecs, &x_offset);

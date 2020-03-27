@@ -1,6 +1,6 @@
 extern crate image;
 use crate::{
-  color::Color,
+  color::RGB,
   vec::{Vec2, Vec3},
 };
 use image::{ImageBuffer, Rgb};
@@ -34,7 +34,7 @@ impl Screen {
   }
   pub fn get(&self, x: usize, y: usize) -> &Vec3<f32> { &self.data[x + self.w * y] }
   pub fn opt_get(&self, x: usize, y: usize) -> Option<&Vec3<f32>> { self.data.get(x + self.w * y) }
-  pub fn line<C: Into<Color<f32>>>(&mut self, p_0: Vec2<f32>, p_1: Vec2<f32>, c: C) {
+  pub fn line<C: Into<RGB<f32>>>(&mut self, p_0: Vec2<f32>, p_1: Vec2<f32>, c: C) {
     let (p_0, p_1) = if p_0.0 < p_1.0 {
       (p_0, p_1)
     } else {
@@ -80,7 +80,7 @@ impl Screen {
       },
     }
   }
-  pub fn circle<C: Into<Color<f32>>>(&mut self, p_0: Vec2<f32>, r: f32, c: C) {
+  pub fn circle<C: Into<RGB<f32>>>(&mut self, p_0: Vec2<f32>, r: f32, c: C) {
     assert!(r > 0.);
     let val = c.into().val();
     let Vec2(x, y) = p_0;

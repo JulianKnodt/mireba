@@ -1,5 +1,5 @@
 use crate::{
-  color::Color,
+  color::RGB,
   map::Map,
   screen::Screen,
   vec::{Ray, Vec2},
@@ -46,7 +46,7 @@ impl Turtle<f32, Vec2<f32>> {
   pub fn draw_lines(&mut self, lines: &[Vec2<f32>], s: &mut Screen) {
     for &l in lines {
       self.state.dir = l;
-      s.line(self.curr_pos(), self.state.at(1.0), Color::tone(0.0));
+      s.line(self.curr_pos(), self.state.at(1.0), RGB::tone(0.0));
       self.step(1.0);
     }
   }

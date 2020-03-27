@@ -1,15 +1,20 @@
 use num::{Float, One, Zero};
+use serde::{Deserialize, Serialize};
 use std::{
   marker::PhantomData,
-  ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Rem, Sub, SubAssign},
+  ops::{
+    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Rem, Sub, SubAssign,
+  },
 };
 
 /// Abstract vector over some finite field
-pub trait Vector<const N: usize>: Div<<Self as Vector<N>>::Field, Output = Self> + Copy {
+pub trait Vector: Div<<Self as Vector>::Field, Output = Self> + Copy {
   type Field: Float;
   /// Inner product of vector with o
   fn dot(&self, o: &Self) -> Self::Field;
-  fn cons(vs: [Self::Field; N]) -> Self { todo!() }
+  /// Construct self from an array of items, if it is less than the dimension of the vector
+  /// The rest will be zero filled.
+  fn cons<const N: usize>(vs: [Self::Field; N]) -> Self;
   /// Returns the square magnitude of this vector
   fn sqr_magn(&self) -> Self::Field { self.dot(self) }
   /// Returns the magnitude of this vector
@@ -26,8 +31,8 @@ pub trait Vector<const N: usize>: Div<<Self as Vector<N>>::Field, Output = Self>
   fn scale_ratio(&self, dst: &Self) -> Self::Field { (dst.sqr_magn() / self.sqr_magn()).sqrt() }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Vec3<T = f32>(pub T, pub T, pub T);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Vec3<T>(pub T, pub T, pub T);
 
 impl<T> Index<usize> for Vec3<T> {
   type Output = T;
@@ -100,18 +105,28 @@ impl<T: One + PartialEq> One for Vec3<T> {
   fn is_one(&self) -> bool { self.0.is_one() && self.1.is_one() && self.2.is_one() }
 }
 
-impl<T: Float> Vector<3> for Vec3<T> {
+impl<T: Float> Vector for Vec3<T> {
   type Field = T;
   fn dot(&self, o: &Self) -> T {
     let &Vec3(i, j, k) = self;
     let &Vec3(x, y, z) = o;
     i * x + j * y + k * z
   }
+  fn cons<const N: usize>(vs: [T; N]) -> Self {
+    let o = T::zero();
+    match &vs[..] {
+      [] => Vec3::zero(),
+      &[a] => Vec3(a, o, o),
+      &[a, b] => Vec3(a, b, o),
+      &[a, b, c, ..] => Vec3(a, b, c),
+    }
+  }
 }
 
 impl<T: Float> Vec3<T> {
   pub fn sqrt(&self) -> Self { Vec3(self.0.sqrt(), self.1.sqrt(), self.2.sqrt()) }
   pub fn sqr_dist(&self, o: &Self) -> T { (*self - *o).sqr_magn() }
+  pub fn dist(&self, o: &Self) -> T { (*self - *o).magn() }
   pub fn floor(&self) -> Self { Vec3(self.0.floor(), self.1.floor(), self.2.floor()) }
   pub fn cross(&self, o: &Self) -> Self {
     let &Vec3(a0, a1, a2) = self;
@@ -121,12 +136,14 @@ impl<T: Float> Vec3<T> {
   pub fn reflect(self, across: &Self) -> Self {
     self - *across * self.dot(&across) * T::from(2.0).unwrap()
   }
-  pub fn refract(self, norm: Vec3<T>, refract_ratio: T) -> Option<Vec3<T>> {
-    let u = self.norm();
-    let dt = u.dot(&norm);
-    Some(T::one() - refract_ratio.powi(2) * (T::one() - dt.powi(2)))
-      .filter(|discrim| discrim.is_sign_positive())
-      .map(|d| (u - norm * dt) * refract_ratio - norm * d.sqrt())
+  pub fn refract(self, norm: Vec3<T>, eta: T) -> Option<Vec3<T>> {
+    let cos_l = self.dot(&norm);
+    let discrim = T::one() - eta * eta * (T::one() - cos_l * cos_l);
+    if discrim.is_sign_negative() {
+      return None;
+    }
+    let cos_r = discrim.sqrt();
+    Some(self * eta - norm * (eta * cos_l + cos_r))
   }
   pub fn lerp(u: T, min: Vec3<T>, max: Vec3<T>) -> Vec3<T> { min * u + max * (T::one() - u) }
   pub fn max_parts(&self, o: &Self) -> Vec3<T> {
@@ -183,7 +200,7 @@ impl<T: Clone> From<T> for Vec3<T> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Ray<T = f32, V = Vec3<T>> {
+pub struct Ray<T, V = Vec3<T>> {
   pub pos: V,
   pub dir: V,
   phantom: PhantomData<T>,
@@ -258,12 +275,20 @@ impl<T> Vec2<T> {
   pub fn flip(self) -> Self { Vec2(self.1, self.0) }
 }
 
-impl<T: Float> Vector<2> for Vec2<T> {
+impl<T: Float> Vector for Vec2<T> {
   type Field = T;
   fn dot(&self, o: &Self) -> T {
     let &Vec2(i, j) = self;
     let &Vec2(x, y) = o;
     i * x + j * y
+  }
+  fn cons<const N: usize>(vs: [T; N]) -> Self {
+    let o = T::zero();
+    match &vs[..] {
+      [] => Vec2::zero(),
+      &[a] => Vec2(a, o),
+      &[a, b, ..] => Vec2(a, b),
+    }
   }
 }
 
@@ -304,12 +329,22 @@ impl<T: Float> From<Vec4<T>> for Vec3<T> {
   }
 }
 
-impl<T: Float> Vector<4> for Vec4<T> {
+impl<T: Float> Vector for Vec4<T> {
   type Field = T;
   fn dot(&self, o: &Self) -> T {
     let &Vec4([x, y, z, w]) = self;
     let &Vec4([i, j, k, l]) = o;
     x * i + y * j + z * k + w * l
+  }
+  fn cons<const N: usize>(vs: [T; N]) -> Self {
+    let o = T::zero();
+    match &vs[..] {
+      [] => Vec4::zero(),
+      &[a] => Vec4([a, o, o, o]),
+      &[a, b] => Vec4([a, b, o, o]),
+      &[a, b, c] => Vec4([a, b, c, o]),
+      &[a, b, c, d, ..] => Vec4([a, b, c, d]),
+    }
   }
 }
 
@@ -320,6 +355,24 @@ impl<T: One + Zero> Vec4<T> {
     let mut out = Vec4::zero();
     out.0[v as usize] = T::one();
     out
+  }
+}
+
+impl<T> Index<usize> for Vec4<T> {
+  type Output = T;
+  fn index(&self, i: usize) -> &Self::Output { &self.0[i] }
+}
+
+impl<T> IndexMut<usize> for Vec4<T> {
+  fn index_mut(&mut self, i: usize) -> &mut Self::Output { &mut self.0[i] }
+}
+
+impl<T: Copy> Vec4<T> {
+  pub fn apply_fn<F, S>(&self, f: F) -> Vec4<S>
+  where
+    F: Fn(T) -> S, {
+    let &Vec4([a, b, c, d]) = self;
+    Vec4([f(a), f(b), f(c), f(d)])
   }
 }
 
@@ -536,3 +589,23 @@ def_scalar_quat_op!(Rem, rem, %);
 def_assign_quat_op!(AddAssign, add_assign, +=);
 def_assign_quat_op!(SubAssign, sub_assign, -=);
 def_assign_quat_op!(MulAssign, mul_assign, *=);
+
+use rand::{
+  distributions::{Distribution, Standard},
+  Rng,
+};
+impl<T> Distribution<Vec3<T>> for Standard
+where
+  Standard: Distribution<T>,
+{
+  fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Vec3<T> {
+    Vec3(rng.gen(), rng.gen(), rng.gen())
+  }
+}
+
+impl<T> Distribution<Vec2<T>> for Standard
+where
+  Standard: Distribution<T>,
+{
+  fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Vec2<T> { Vec2(rng.gen(), rng.gen()) }
+}

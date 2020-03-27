@@ -1,5 +1,4 @@
-use crate::{map::Map, vec::*};
-use crate::mat::Matrix3;
+use crate::{map::Map, mat::Matrix3, vec::*};
 use quickcheck::TestResult;
 
 quickcheck! {

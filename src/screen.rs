@@ -1,10 +1,10 @@
-extern crate image;
 use crate::{
   color::RGB,
-  vec::{Vec2, Vec3},
 };
-use image::{ImageBuffer, Rgb};
+use linalg::vec::{Vec2, Vec3};
+use linalg::num::Float;
 use num::Zero;
+use image::{ImageBuffer, Rgb, Rgba};
 use std::path::Path;
 
 // TODO make screen generic over floats
@@ -14,7 +14,14 @@ pub struct Screen {
   data: Vec<Vec3<f32>>,
 }
 
-fn vec3_to_rgb(v: &Vec3<f32>) -> Rgb<u8> { Rgb([v.0 as u8, v.1 as u8, v.2 as u8]) }
+fn vec3_to_rgb(v: &Vec3<f32>) -> Rgb<u8> {
+  Rgb([(v.0 * 255.) as u8, (v.1 * 255.) as u8, (v.2 * 255.) as u8])
+}
+
+fn rgb_to_rgba(c: Rgb<u8>) -> Rgba<u8> {
+  let Rgb([r, g, b]) = c;
+  Rgba([r, g, b, 255])
+}
 
 impl Screen {
   pub fn new(w: usize, h: usize) -> Self {
@@ -34,7 +41,7 @@ impl Screen {
   }
   pub fn get(&self, x: usize, y: usize) -> &Vec3<f32> { &self.data[x + self.w * y] }
   pub fn opt_get(&self, x: usize, y: usize) -> Option<&Vec3<f32>> { self.data.get(x + self.w * y) }
-  pub fn line<C: Into<RGB<f32>>>(&mut self, p_0: Vec2<f32>, p_1: Vec2<f32>, c: C) {
+  pub fn line<C: Into<RGB<f32>>>(&mut self, p_0: Vec2<f32>, p_1: Vec2<f32>, color: C) {
     let (p_0, p_1) = if p_0.0 < p_1.0 {
       (p_0, p_1)
     } else {
@@ -42,7 +49,7 @@ impl Screen {
     };
     let Vec2(x_0, y_0) = p_0;
     let Vec2(x_1, y_1) = p_1;
-    let val = c.into().val();
+    let val = color.into().val();
     match (x_0 as usize == x_1 as usize, y_0 as usize == y_1 as usize) {
       (true, true) => self.set(x_0 as usize, y_0 as usize, val),
       (true, false) => {
@@ -144,13 +151,38 @@ impl Screen {
     });
   }
   pub fn write_image<Q: AsRef<Path>>(&self, to: Q) {
-    let mut buf = ImageBuffer::new(self.w as u32, self.h as u32);
+    self.write_buffer().save(to).expect("Failed to save");
+  }
+  pub fn write_buffer_into(&self, buf: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
     (0..self.h).for_each(|y| {
       (0..self.w).for_each(|x| {
-        let color = vec3_to_rgb(self.get(x, y));
+        let color = rgb_to_rgba(vec3_to_rgb(self.get(x, y)));
         buf.put_pixel(x as u32, y as u32, color);
       })
     });
-    buf.save(to).expect("Failed to save");
+  }
+  pub fn write_buffer(&self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let mut buf = ImageBuffer::new(self.w as u32, self.h as u32);
+    self.write_buffer_into(&mut buf);
+    buf
+  }
+}
+
+#[derive(Debug)]
+pub struct ZBuffer<T: Float>(pub Vec<T>);
+impl<T: Float> ZBuffer<T> {
+  pub fn new(width: usize, height: usize) -> Self { ZBuffer(vec![T::one(); width * height]) }
+  pub fn reset(&mut self) {
+    for i in 0..self.0.len() {
+      self.0[i] = T::one();
+    }
+  }
+  #[inline]
+  pub fn mark(&mut self, i: usize, v: T) -> bool {
+    let check = self.0[i] < v && v >= -T::one();
+    if check {
+      self.0[i] = v;
+    }
+    check
   }
 }

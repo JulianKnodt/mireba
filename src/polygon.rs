@@ -1,4 +1,4 @@
-use crate::{
+use linalg::{
   map::Map,
   vec::{Ray, Vec2, Vector},
 };

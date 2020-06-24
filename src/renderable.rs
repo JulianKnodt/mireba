@@ -1,16 +1,15 @@
+use linalg::vec::Ray;
 use crate::{
   aabox::AABox,
   bounds::{Bounded, Bounds},
   indexed_triangles::IndexedTriangles,
   plane::Plane,
   sphere::Sphere,
-  vec::Ray,
   vis::{Visibility, Visible},
 };
-use num::Float;
-use serde::{Deserialize, Serialize};
+use linalg::num::Float;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum Renderable<D: Float> {
   // TODo should these references so that it can save space?
   Sphere(Sphere<D>),

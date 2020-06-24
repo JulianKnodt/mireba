@@ -1,5 +1,5 @@
-use crate::vec::Vec3;
-use num::Float;
+use linalg::vec::Vec3;
+use linalg::num::Float;
 
 /// Tuple of color and alpha value
 #[derive(Debug, Clone, Copy)]
@@ -10,6 +10,11 @@ pub struct RGB<D = f32>(Vec3<D>);
 
 impl<D: Float> RGB<D> {
   pub fn new(r: D, g: D, b: D) -> Self { RGB(Vec3(r, g, b)) }
+  pub fn red() -> Self { RGB(Vec3::basis(0)) }
+  pub fn green() -> Self { RGB(Vec3::basis(1)) }
+  pub fn blue() -> Self { RGB(Vec3::basis(2)) }
+  pub fn yellow() -> Self { RGB(Vec3(D::one(), D::one(), D::zero())) }
+  pub fn purple() -> Self { RGB(Vec3(D::one(), D::zero(), D::one())) }
   pub fn gamma(&self, gamma: D) -> Self { RGB(self.0.apply_fn(|i| i.powf(gamma))) }
   pub fn tone(t: D) -> Self {
     let t = num::clamp(t, D::zero(), D::one());
@@ -50,6 +55,7 @@ impl<D: Float> RGB<D> {
     let max = D::from(255.0).unwrap();
     Vec3(i * max, j * max, k * max)
   }
+  pub fn into_inner(self) -> Vec3<D> { self.0 }
 }
 
 impl<D: Float> From<Vec3<D>> for RGB<D> {

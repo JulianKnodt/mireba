@@ -1,0 +1,191 @@
+{
+  "materials": [
+    {
+      "Lambertian": {
+        "albedo": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "Lambertian": {
+        "albedo": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "Lambertian": {
+        "albedo": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "Lambertian": {
+        "albedo": [
+          1.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "Lambertian": {
+        "albedo": [
+          1.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "Checkers": null
+    }
+  ],
+  "shapes": [
+    {
+      "Sphere": {
+        "center": [
+          -3.0,
+          3.0,
+          3.0
+        ],
+        "radius": 1.0
+      }
+    },
+    {
+      "Sphere": {
+        "center": [
+          5.0,
+          4.0,
+          3.0
+        ],
+        "radius": 1.0
+      }
+    },
+    {
+      "Sphere": {
+        "center": [
+          -3.0,
+          4.0,
+          5.0
+        ],
+        "radius": 1.0
+      }
+    },
+    {
+      "Sphere": {
+        "center": [
+          -3.0,
+          4.0,
+          5.0
+        ],
+        "radius": 1.0
+      }
+    },
+    {
+      "Sphere": {
+        "center": [
+          3.0,
+          -3.0,
+          -3.0
+        ],
+        "radius": 1.0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "Shape": {
+        "mat": 0,
+        "shape": 0
+      }
+    },
+    {
+      "Shape": {
+        "mat": 1,
+        "shape": 1
+      }
+    },
+    {
+      "Shape": {
+        "mat": 2,
+        "shape": 2
+      }
+    },
+    {
+      "Shape": {
+        "mat": 2,
+        "shape": 3
+      }
+    },
+    {
+      "Shape": {
+        "mat": 3,
+        "shape": 4
+      }
+    }
+  ],
+  "lights": [
+    {
+      "Point": {
+        "pos": [
+          5.0,
+          5.0,
+          7.0
+        ],
+        "intensity": 1.0,
+        "attenuation": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "Point": {
+        "pos": [
+          -5.0,
+          -5.0,
+          -7.0
+        ],
+        "intensity": 1.0,
+        "attenuation": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    }
+  ],
+  "settings": {
+    "recursive_depth": 0,
+    "ambient_illumination": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "background_color": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

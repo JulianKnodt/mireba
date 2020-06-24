@@ -1,20 +1,18 @@
+use linalg::vec::{Ray, Vec3};
 use crate::{
-  light::{Emitter, Light},
-  vec::{Ray, Vec3, Vector},
+  brdf::Illum,
+  mtl::MTL,
+  num::Float,
   vis::Visibility,
 };
-use num::{Float, One, Zero};
-use rand::prelude::*;
-use rand_distr::{Standard, StandardNormal};
-use serde::{Deserialize, Serialize};
-
-// TODO I need to remove attenuation being optional and also need to make rays optional and an
-// iterator. There could be multiple outputs rays, as well as rays that pass through the
-// material.
+use num::{One, Zero};
 
 // is there some way to combine different materials components so that we can have the
 // reflectance of one and emittance of another?
 
+/*
+use rand::prelude::*;
+use rand_distr::{Standard, StandardNormal};
 fn rand_in_unit_sphere<T: Float>() -> Vec3<T>
 where
   StandardNormal: Distribution<T>,
@@ -24,44 +22,42 @@ where
   let v = Vec3(rng.sample(std), rng.sample(std), rng.sample(std)).norm();
   v / rng.gen().powf(T::from(1.0 / 3.0).unwrap())
 }
+*/
 
-pub trait Material<T> {
-  /// Returns how much reflected light should be retained
-  fn albedo(&self) -> Vec3<T>;
+pub trait Material<T: Zero + One> {
+  /// How much diffuse light is retained
+  fn diffuse_refl(&self) -> Vec3<T> { Vec3::zero() }
+  /// How much ambient light is retained
+  fn ambient_refl(&self) -> Vec3<T> { Vec3::zero() }
+  /// How much specular light is retained
+  fn specular_refl(&self) -> Vec3<T> { Vec3::zero() }
+  /// How much transparent light is retained
+  fn transparent_refl(&self) -> Vec3<T> { Vec3::zero() }
 
-  /// Returns the color at visibility with the given lights
-  fn color(&self, src: &Ray<T>, vis: &Visibility<T>, light: &Light<T>) -> Vec3<T>;
+  /// How shiny is this material?
+  fn shine(&self) -> T { T::one() }
+
+  // TODO add something for brdf
 
   /// Returns a possible reflected ray if one exists
-  // TODO think about this API design as it's a little clunky without impl Iterator
-  fn reflected(&self, _: &Ray<T>, _: &Visibility<T>) -> Option<Ray<T>> { None }
+  fn reflected(&self, _eye: &Ray<T>, _vis: &Visibility<T>) -> Option<Ray<T>> { None }
 
   /// Returns a possible reflected ray if one exists
-  // TODO think about this API design as it's a little clunky without impl Iterator
-  fn refracted(&self, _: &Ray<T>, _: &Visibility<T>) -> Option<Ray<T>> { None }
+  fn refracted(&self, _eye: &Ray<T>, _vis: &Visibility<T>) -> Option<Ray<T>> { None }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Lambertian<T> {
-  // This is both the color of the surface and what will get reflected.
-  pub albedo: Vec3<T>,
-}
-
+pub fn lambertian<T: Float>(albedo: Vec3<T>) -> MTL<T> { MTL::empty().diffuse(albedo).illum(1) }
+pub fn checkers<T: Float>() -> MTL<T> { MTL::empty().brdf(Illum::Checkers) }
+/*
 impl<T: Float> Material<T> for Lambertian<T>
 where
   StandardNormal: Distribution<T>,
   Standard: Distribution<T>,
 {
-  fn albedo(&self) -> Vec3<T> { self.albedo }
+  fn diffuse_refl(&self) -> Vec3<T> { self.albedo }
   fn reflected(&self, _: &Ray<T>, vis: &Visibility<T>) -> Option<Ray<T>> {
     let target = vis.pos + vis.norm.norm() + rand_in_unit_sphere();
     Some(Ray::new(vis.pos, target - vis.pos))
-  }
-  /// Returns the color at visibility with the given lights
-  fn color(&self, src: &Ray<T>, vis: &Visibility<T>, light: &Light<T>) -> Vec3<T> {
-    let intensity = light.intensity(&vis);
-    let to_light = light.dir(&vis.pos);
-    self.albedo * vis.norm.dot(&to_light) * intensity
   }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,7 +75,7 @@ where
   Standard: Distribution<T>,
 {
   /// All reflections are ok
-  fn albedo(&self) -> Vec3<T> { Vec3::one() }
+  fn diffuse_refl(&self) -> Vec3<T> { self.albedo }
   fn reflected(&self, r: &Ray<T>, vis: &Visibility<T>) -> Option<Ray<T>> {
     let bounce = Ray::new(
       vis.pos,
@@ -87,7 +83,6 @@ where
     );
     Some(bounce).filter(|b| b.dir.dot(&vis.norm).is_sign_positive())
   }
-  fn color(&self, _: &Ray<T>, v: &Visibility<T>, _: &Light<T>) -> Vec3<T> { Vec3::zero() }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,7 +106,7 @@ impl<T: Float> Material<T> for Dielectric<T>
 where
   Standard: Distribution<T>,
 {
-  fn albedo(&self) -> Vec3<T> { self.refract_color }
+  fn specular_refl(&self) -> Vec3<T> { self.refract_color }
   fn reflected(&self, r: &Ray<T>, vis: &Visibility<T>) -> Option<Ray<T>> {
     let unit_norm = vis.norm.norm();
     let v = r.dir.norm().dot(&unit_norm);
@@ -131,47 +126,21 @@ where
       .unwrap_or_else(|| r.dir.norm().reflect(&unit_norm));
     Some(Ray::new(vis.pos, out))
   }
-  fn color(&self, _: &Ray<T>, v: &Visibility<T>, _: &Light<T>) -> Vec3<T> { Vec3::one() }
 }
-
-/*
-/// Material with sharp reflection but fast cutoff
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct GGX<D> {
-  gloss: D,
-  tail: D,
-}
-
-impl<D: Float> Material<D> for GGX<D> {
-  fn color(&self, r: &Ray<D>, vis: &Visibility<D>) -> Vec3<D> {
-    let d = vis.norm.dot(&r.dir).powf(self.tail);
-    Vec3::from(d)
-  }
-  fn reflected(&self, _: &Ray<D>, vis: &Visibility<D>) -> Option<Ray<D>> {
-    Some(Ray::new(vis.pos, vis.norm))
-  }
-}
-*/
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Checkers;
-impl<D: Float> Material<D> for Checkers {
-  fn albedo(&self) -> Vec3<D> { Vec3::one() }
-  fn color(&self, _: &Ray<D>, vis: &Visibility<D>, _: &Light<D>) -> Vec3<D> {
-    let Vec3(x, y, z) = vis.pos.floor().apply_fn(|v| v.abs());
-    Vec3::one() * ((x + y + z) % D::from(2.0).unwrap())
-  }
-}
+impl<D: Float> Material<D> for Checkers {}
 
 /// Wrapper around all valid instances of materials.
 /// Used instead of dyn material for efficiency
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Mat<D = f32> {
   Dielectric(Dielectric<D>),
   Metallic(Metallic<D>),
   Lambertian(Lambertian<D>),
-  // GGX(GGX<D>),
   Checkers(Checkers),
+  MTL(MTL<D>),
 }
 
 const CHECKERS: Mat = Mat::Checkers(Checkers);
@@ -183,15 +152,35 @@ where
   Metallic<D>: Material<D>,
   Dielectric<D>: Material<D>,
   Lambertian<D>: Material<D>,
-  // GGX<D>: Material<D>,
 {
-  fn albedo(&self) -> Vec3<D> {
+  fn diffuse_refl(&self) -> Vec3<D> {
     match self {
-      Mat::Dielectric(ref di) => di.albedo(),
-      Mat::Metallic(ref m) => m.albedo(),
-      Mat::Lambertian(ref l) => l.albedo(),
-      // Mat::GGX(ref s) => s.albedo(),
-      Mat::Checkers(ref c) => c.albedo(),
+      Mat::Dielectric(ref di) => di.diffuse_refl(),
+      Mat::Metallic(ref m) => m.diffuse_refl(),
+      Mat::Lambertian(ref l) => l.diffuse_refl(),
+      // Mat::GGX(ref s) => s.diffuse_refl(),
+      Mat::Checkers(ref c) => c.diffuse_refl(),
+      Mat::MTL(ref m) => m.diffuse_refl(),
+    }
+  }
+  fn specular_refl(&self) -> Vec3<D> {
+    match self {
+      Mat::Dielectric(ref di) => di.specular_refl(),
+      Mat::Metallic(ref m) => m.specular_refl(),
+      Mat::Lambertian(ref l) => l.specular_refl(),
+      // Mat::GGX(ref s) => s.specular_refl(),
+      Mat::Checkers(ref c) => c.specular_refl(),
+      Mat::MTL(ref m) => m.specular_refl(),
+    }
+  }
+  fn ambient_refl(&self) -> Vec3<D> {
+    match self {
+      Mat::Dielectric(ref di) => di.ambient_refl(),
+      Mat::Metallic(ref m) => m.ambient_refl(),
+      Mat::Lambertian(ref l) => l.ambient_refl(),
+      // Mat::GGX(ref s) => s.ambient_refl(),
+      Mat::Checkers(ref c) => c.ambient_refl(),
+      Mat::MTL(ref m) => m.ambient_refl(),
     }
   }
   fn reflected(&self, r: &Ray<D>, vis: &Visibility<D>) -> Option<Ray<D>> {
@@ -201,15 +190,17 @@ where
       Mat::Lambertian(ref l) => l.reflected(r, vis),
       // Mat::GGX(ref g) => g.reflected(r, vis),
       Mat::Checkers(ref c) => c.reflected(r, vis),
+      Mat::MTL(ref m) => m.reflected(r, vis),
     }
   }
-  fn color(&self, r: &Ray<D>, vis: &Visibility<D>, light: &Light<D>) -> Vec3<D> {
+  fn refracted(&self, r: &Ray<D>, vis: &Visibility<D>) -> Option<Ray<D>> {
     match self {
-      Mat::Dielectric(ref di) => di.color(r, vis, light),
-      Mat::Metallic(ref m) => m.color(r, vis, light),
-      Mat::Lambertian(ref l) => l.color(r, vis, light),
-      // Mat::GGX(ref g) => g.color(r, vis, light),
-      Mat::Checkers(ref c) => c.color(r, vis, light),
+      Mat::Dielectric(ref di) => di.refracted(r, vis),
+      Mat::Metallic(ref m) => m.refracted(r, vis),
+      Mat::Lambertian(ref l) => l.refracted(r, vis),
+      // Mat::GGX(ref g) => g.refracted(r, vis),
+      Mat::Checkers(ref c) => c.refracted(r, vis),
+      Mat::MTL(ref m) => m.refracted(r, vis),
     }
   }
 }
@@ -217,6 +208,7 @@ where
 macro_rules! mat_from {
   ($name: ty, $out: path) => {
     impl<D> From<$name> for Mat<D> {
+      #[inline]
       fn from(src: $name) -> Self { $out(src) }
     }
   };
@@ -225,4 +217,6 @@ mat_from!(Dielectric<D>, Mat::Dielectric);
 mat_from!(Metallic<D>, Mat::Metallic);
 mat_from!(Lambertian<D>, Mat::Lambertian);
 // mat_from!(D, GGX<D>, Mat::GGX);
+mat_from!(MTL<D>, Mat::MTL);
 mat_from!(Checkers, Mat::Checkers);
+*/

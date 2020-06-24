@@ -1,20 +1,22 @@
-use crate::{
-  color::RGB,
+use linalg::{
   map::Map,
-  screen::Screen,
   vec::{Ray, Vec2},
 };
-use num::Float;
+use crate::{
+  color::RGB,
+  screen::Screen,
+};
+use num::{Float};
 use std::ops::{Add, Mul};
 
 /// Turtle which can move through arbitrary space
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Turtle<D = f32, V = Vec2<D>> {
-  pub state: Ray<D, V>,
-  saves: Vec<Ray<D, V>>,
+pub struct Turtle<T = f32, V = Vec2<T>> {
+  pub state: Ray<T, V>,
+  saves: Vec<Ray<T, V>>,
 }
 
-impl<D, V> Turtle<D, V> {
+impl<T, V> Turtle<T, V> {
   pub fn at(position: V, dir: V) -> Self {
     Turtle {
       state: Ray::new(position, dir),
@@ -23,7 +25,7 @@ impl<D, V> Turtle<D, V> {
   }
 }
 
-impl<D: Copy, V: Copy> Turtle<D, V> {
+impl<T: Copy, V: Copy> Turtle<T, V> {
   pub fn curr_pos(&self) -> V { self.state.pos }
   pub fn curr_dir(&self) -> V { self.state.dir }
   pub fn save(&mut self) { self.saves.push(self.state); }
@@ -52,7 +54,7 @@ impl Turtle<f32, Vec2<f32>> {
   }
 }
 
-impl<D, V> Turtle<D, V> {
+impl<T, V> Turtle<T, V> {
   pub fn map<F>(&mut self, f: F)
   where
     V: Map<F, Operator = F>, {

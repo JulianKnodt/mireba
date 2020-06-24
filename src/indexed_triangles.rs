@@ -1,146 +1,156 @@
+use linalg::vec::{Ray, Vec3};
+use linalg::num::{Float};
 use crate::{
+  mtl::{read_mtl, MTL},
+  triangle::Triangle,
   util::triangulate,
-  vec::{Ray, Vec3, Vector},
   vis::{Visibility, Visible},
+  bounds::{Bounded, Bounds},
 };
-use num::Float;
-use serde::{
-  de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor},
-  ser::{Serialize, SerializeStruct, Serializer},
-};
-use std::{ffi::OsString, io, path::Path};
+use std::{ffi::OsString, io::BufRead, str::FromStr};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A group of faces
+#[derive(Debug, Default)]
+struct FaceGroup {
+  name: String,
+  /// Which material is this face using
+  mtl: Option<usize>,
+  verts: Vec<Vec3<usize>>,
+  normals: Option<Vec<Vec3<usize>>>,
+  textures: Option<Vec<Vec3<usize>>>,
+}
+
+impl FaceGroup {
+  fn empty() -> Self { Default::default() }
+  fn is_empty(&self) -> bool { self.verts.is_empty() }
+  fn add<I: Iterator<Item = Vec3<(usize, Option<usize>, Option<usize>)>>>(&mut self, iter: I) {
+    for i in iter {
+      let Vec3(v1, v2, v3) = i;
+      let (v1, vt1, vn1) = v1;
+      let (v2, vt2, vn2) = v2;
+      let (v3, vt3, vn3) = v3;
+      self.verts.push(Vec3(v1, v2, v3));
+      match (vt1, vt2, vt3) {
+        (None, None, None) => (),
+        (Some(vt1), Some(vt2), Some(vt3)) => self
+          .textures
+          .get_or_insert_with(Vec::new)
+          .push(Vec3(vt1, vt2, vt3)),
+        _ => panic!("Some vertices specified textures while others did not"),
+      };
+      match (vn1, vn2, vn3) {
+        (None, None, None) => (),
+        (Some(vn1), Some(vn2), Some(vn3)) => self
+          .normals
+          .get_or_insert_with(Vec::new)
+          .push(Vec3(vn1, vn2, vn3)),
+        _ => panic!("Some vertices specified textures while others did not"),
+      }
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct IndexedTriangles<D> {
   /// list of vertices
   verts: Vec<Vec3<D>>,
   /// list of normals
   norms: Vec<Vec3<D>>,
-  // /// list of textures
-  // list of indeces triangles
-  triangles: Vec<Vec3<usize>>,
+  /// list of textures
+  textures: Vec<Vec3<D>>,
+
+  groups: Vec<FaceGroup>,
+
+  /// These are all MTLs cast to Mats
+  mtls: Vec<MTL<D>>,
 
   /// Which file did this come from?
-  src_file: OsString,
+  pub src_file: OsString,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct LoanedTriangle<'a, T> {
   pub(crate) src: &'a IndexedTriangles<T>,
+  // Which face group does this triangle belong to?
+  pub(crate) group: usize,
+  // Which number in the face group is this triangle
   pub(crate) n: usize,
 }
 
-impl<'a, T> LoanedTriangle<'a, T> {
-  pub fn vert(&self, n: u8) -> &'a Vec3<T> {
-    assert!(n < 3);
-    &self.src.verts[*self.src.triangles[self.n].nth(n)]
+/// Naive iteration of triangles for rendering
+impl<T: Float> Visible<T> for IndexedTriangles<T> {
+  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>> {
+    let mut bounds = T::epsilon()..T::infinity();
+    self
+      .iter()
+      .fold(None, |best, tri| match tri.hit_bounded(r, &bounds) {
+        Some(h) if bounds.contains(&h.param) => {
+          bounds.end = h.param;
+          Some(h)
+        },
+        _ => best,
+      })
   }
-  pub fn stl_normal(&self) -> Option<&'a Vec3<T>> {
-    let normal_idx = self.src.triangles[self.n][0] / 3;
-    self.src.norms.get(normal_idx)
+}
+impl<T: Float> IndexedTriangles<T> {
+  pub fn trace_ray<'a>(&'a self, r: &Ray<T>) -> Option<(Visibility<T>, &'a MTL<T>)> {
+    let mut bounds = T::epsilon()..T::infinity();
+    let (vis, tri) = self
+      .iter()
+      .fold(None, |best, tri| match tri.hit_bounded(r, &bounds) {
+        Some(h) if bounds.contains(&h.param) => {
+          bounds.end = h.param;
+          Some((h, tri))
+        },
+        _ => best,
+      })?;
+    let mtl = tri.mtl().expect("No material found for this triangle");
+    Some((vis, mtl))
   }
+}
+
+impl<T: Float> Bounded<Vec3<T>> for IndexedTriangles<T> {
+  fn bounds(&self) -> Bounds<Vec3<T>> {
+    let mut all_bounds = self.iter().map(|t| t.triangle().bounds());
+    let first = all_bounds.next().unwrap();
+    all_bounds.fold(first, |acc, n| acc.union(&n))
+  }
+}
+
+impl<'a, T: Float> Visible<T> for LoanedTriangle<'a, T> {
+  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>> { self.triangle().intersect2(&r) }
 }
 
 impl<'a, T: Float> LoanedTriangle<'a, T> {
-  pub fn bary_normal(&self, at: &Vec3<T>) -> Vec3<T> {
-    let Vec3(n0, n1, n2) = self.src.triangles[self.n];
-    let n0 = &self.src.norms[n0];
-    let n1 = &self.src.norms[n1];
-    let n2 = &self.src.norms[n2];
-    barycentric(n0, n1, n2, at)
+  pub fn triangle(&self) -> Triangle<&'a Vec3<T>> {
+    let &Vec3(i0, i1, i2) = &self.src.groups[self.group].verts[self.n];
+    let v0 = &self.src.verts[i0];
+    let v1 = &self.src.verts[i1];
+    let v2 = &self.src.verts[i2];
+    Triangle(Vec3(v0, v1, v2))
+  }
+  pub fn mtl(&self) -> Option<&'a MTL<T>> {
+    self.src.groups[self.group].mtl.map(|i| &self.src.mtls[i])
   }
 }
 
-fn barycentric<T: Float>(a: &Vec3<T>, b: &Vec3<T>, c: &Vec3<T>, p: &Vec3<T>) -> Vec3<T> {
-  let v0 = b - a;
-  let v1 = c - a;
-  let v2 = p - a;
-  let d00 = v0.dot(&v0);
-  let d01 = v0.dot(&v1);
-  let d11 = v1.dot(&v1);
-  let d20 = v2.dot(&v0);
-  let d21 = v2.dot(&v1);
-  let denom = d00 * d11 - d01 * d01;
-  let v = (d11 * d20 - d01 * d21) / denom;
-  let w = (d00 * d21 - d01 * d20) / denom;
-  let u = T::one() - v - w;
-  Vec3(u, v, w)
-}
-
-// Intersection of a triangle
-impl<'a, T: Float> Visible<T> for LoanedTriangle<'a, T> {
-  fn hit(&self, r: &Ray<T>) -> Option<Visibility<T>> {
-    let vert0 = *self.vert(0);
-    let vert1 = *self.vert(1);
-    let vert2 = *self.vert(2);
-    let edge_0 = vert1 - vert0;
-    let edge_1 = vert2 - vert0;
-    let h = r.dir.cross(&edge_1);
-    let a = edge_0.dot(&h);
-    if a.abs() < T::epsilon() {
-      return None;
-    }
-    let f = a.recip();
-    let s = r.pos - vert0;
-    let u = f * s.dot(&h);
-    if u < T::zero() || u > T::one() {
-      return None;
-    }
-    let q = s.cross(&edge_0);
-    let v = f * r.dir.dot(&q);
-    if v < T::zero() || u + v > T::one() {
-      return None;
-    }
-    let t = f * edge_1.dot(&q);
-    if t < T::epsilon() || t > T::max_value() {
-      return None;
-    }
-    // let pos = r.at(t);
-    let norm = edge_0.cross(&edge_1);
-    // let norm = self
-    //      .bary_normal(&pos);
-    // .map(|v| *v)
-    // .unwrap_or_else(|| edge_0.cross(&edge_1));
-    Some(Visibility {
-      param: t,
-      pos: r.at(t),
-      norm,
-    })
-  }
+#[derive(Debug, Copy, Clone)]
+pub struct Iter<'a, T> {
+  triangle_list: &'a IndexedTriangles<T>,
+  group: usize,
+  curr: usize,
 }
 
 impl<T> IndexedTriangles<T> {
-  pub fn len(&self) -> usize { self.triangles.len() }
-  pub fn is_empty(&self) -> bool { self.triangles.is_empty() }
+  pub fn len(&self) -> usize { self.groups.iter().map(|fg| fg.verts.len()).sum() }
+  pub fn is_empty(&self) -> bool { self.groups.is_empty() }
   pub fn iter(&self) -> Iter<'_, T> {
     Iter {
       triangle_list: self,
+      group: 0,
       curr: 0,
     }
   }
-  pub fn triangle(&self, n: usize) -> LoanedTriangle<'_, T> { LoanedTriangle { src: self, n } }
-}
-
-impl<T: Float> IndexedTriangles<T> {
-  pub fn shift(&mut self, xyz: Vec3<T>) {
-    self.verts.iter_mut().for_each(|vert| {
-      vert.0 = vert.0 + xyz.0;
-      vert.1 = vert.1 + xyz.1;
-      vert.2 = vert.2 + xyz.2;
-    });
-  }
-  pub fn scale(&mut self, s: T) {
-    self.verts.iter_mut().for_each(|vert| {
-      vert.0 = vert.0 * s;
-      vert.1 = vert.1 * s;
-      vert.2 = vert.2 * s;
-    });
-  }
-}
-
-pub struct Iter<'a, T> {
-  triangle_list: &'a IndexedTriangles<T>,
-  curr: usize,
 }
 
 impl<'a, T> Iterator for Iter<'a, T>
@@ -149,24 +159,75 @@ where
 {
   type Item = LoanedTriangle<'a, T>;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.curr == self.triangle_list.len() {
-      return None;
+    while self.curr == self.triangle_list.groups[self.group].verts.len() {
+      self.group += 1;
+      self.curr = 0;
+      if self.group == self.triangle_list.groups.len() {
+        return None;
+      }
     }
-    let out = self.triangle_list.triangle(self.curr);
+    let out = LoanedTriangle {
+      src: self.triangle_list,
+      group: self.group,
+      n: self.curr,
+    };
     self.curr += 1;
     Some(out)
   }
 }
 
-use std::{fs::File, io::BufRead};
+pub fn parse_slashed<D: FromStr>(
+  s: &str,
+) -> Result<(D, Option<D>, Option<D>), <D as FromStr>::Err>
+where
+  <D as FromStr>::Err: std::fmt::Debug, {
+  let mut items = s.split('/');
+  let v = items.next().unwrap().parse::<D>()?;
+  let vt = if let Some(vt) = items.next() {
+    Some(vt.parse()?)
+  } else {
+    None
+  };
+  let vn = if let Some(vn) = items.next() {
+    Some(vn.parse()?)
+  } else {
+    None
+  };
+  Ok((v, vt, vn))
+}
 
+#[test]
+fn test_from_ascii_obj() {
+  let p = Path::new(file!())
+    .parent()
+    .unwrap()
+    .join("sample_files")
+    .join("teapot.obj");
+  assert!(from_ascii_obj::<_, f32>(p).is_ok());
+}
+
+// Added test for more features of obj
+#[test]
+#[cfg(not(debug_assertions))]
+fn test_from_ascii_obj_complex() {
+  let p = Path::new(file!())
+    .parent()
+    .unwrap()
+    .join("sample_files")
+    .join("sponza.obj");
+  assert!(from_ascii_obj::<_, f32>(p).is_ok());
+}
+
+/*
 pub fn from_ascii_stl<P: AsRef<Path>, T: Float>(p: P) -> io::Result<IndexedTriangles<T>> {
   let f = File::open(p.as_ref())?;
   let buf = io::BufReader::new(f);
   let mut triangle_list: IndexedTriangles<T> = IndexedTriangles {
     verts: vec![],
     triangles: vec![],
+    textures: vec![],
     norms: vec![],
+    mtls: vec![],
     src_file: p.as_ref().as_os_str().to_os_string(),
   };
   let mut count = 0;
@@ -212,125 +273,6 @@ fn test_from_ascii_stl() {
     .unwrap()
     .join("sample_files")
     .join("magnolia.stl");
-  assert!(from_ascii_stl(p, crate::material::CHECKERS_REF).is_ok());
+  assert!(from_ascii_stl::<_, f32>(p).is_ok());
 }
-
-pub fn from_ascii_obj<P: AsRef<Path>, T: Float>(p: P) -> io::Result<IndexedTriangles<T>> {
-  let f = File::open(p.as_ref())?;
-  let buf = io::BufReader::new(f);
-  let mut triangle_list = IndexedTriangles {
-    verts: vec![],
-    triangles: vec![],
-    norms: vec![],
-    src_file: p.as_ref().as_os_str().to_os_string(),
-  };
-  for line in buf.lines() {
-    let line = line?;
-    // TODO convert this into not using convert
-    let parts = line.split_whitespace().collect::<Vec<_>>();
-    match parts.as_slice() {
-      [] | ["#", ..] => (),
-      // TODO figure out what this means
-      ["g", ..] => (),
-      ["v", x, y, z] => {
-        let pos = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| todo!());
-        triangle_list.verts.push(pos);
-      },
-      ["v", x, y, z, _w] => {
-        let pos = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| todo!());
-        triangle_list.verts.push(pos);
-      },
-      // Vertex normal
-      ["vn", i, j, k] => {
-        let norm = Vec3::<T>::from_str_radix((i, j, k), 10).unwrap_or_else(|_| todo!());
-        triangle_list.norms.push(norm);
-      },
-      // Vertex Textures
-      ["vt", _u, _v, _w] => todo!(),
-      // Points
-      ["p", _vs @ ..] => todo!(),
-      // Faces
-      ["f", fs @ ..] => {
-        if fs.len() < 3 {
-          panic!("OBJ faces require at least 3 elements")
-        }
-        let vert_indeces = fs
-          .iter()
-          .map(|f| f.parse::<usize>().unwrap())
-          // 1 indexed in obj so need to subtract 1
-          .map(|f| f - 1);
-        triangulate(vert_indeces).for_each(|f| {
-          triangle_list.triangles.push(f);
-        });
-      },
-      ["s", "off"] => (),
-      l => panic!("Unexpected {:?}", l),
-    };
-  }
-  Ok(triangle_list)
-}
-
-impl<D> Serialize for IndexedTriangles<D> {
-  fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-    let mut state = serializer.serialize_struct("IndexedTriangles", 1)?;
-    state.serialize_field("src_file", &self.src_file)?;
-    state.end()
-  }
-}
-
-use std::fmt;
-impl<'de, T: Float> Deserialize<'de> for IndexedTriangles<T> {
-  fn deserialize<D: Deserializer<'de>>(des: D) -> Result<Self, D::Error> {
-    use std::marker::PhantomData;
-    #[derive(Debug, serde::Deserialize)]
-    enum Field {
-      #[serde(rename = "src_file")]
-      SrcFile,
-    }
-    struct ITVisitor<F>(PhantomData<F>);
-    impl<'de, F: Float> Visitor<'de> for ITVisitor<F> {
-      type Value = IndexedTriangles<F>;
-      fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("struct IndexedTrianges")
-      }
-      fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<Self::Value, V::Error> {
-        let p: OsString = seq
-          .next_element()?
-          .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-        let idt = match Path::new(&p).extension() {
-          None => panic!("No extension, cannot render"),
-          Some(stl) if stl == "stl" => from_ascii_stl(stl),
-          Some(obj) if obj == "obj" => from_ascii_obj(p),
-          v => panic!("Invalid extension {:?}", v),
-        };
-        Ok(idt.unwrap())
-      }
-      fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<Self::Value, V::Error> {
-        let p: OsString = if let Some(Field::SrcFile) = map.next_key::<Field>()? {
-          map.next_value()?
-        } else {
-          return Err(de::Error::missing_field("src_file"));
-        };
-        let idt = match Path::new(&p).extension() {
-          None => panic!("No extension, cannot render"),
-          Some(stl) if stl == "stl" => from_ascii_stl(stl),
-          Some(obj) if obj == "obj" => from_ascii_obj(p),
-          v => panic!("Invalid extension {:?}", v),
-        };
-        Ok(idt.unwrap())
-      }
-    }
-    const FIELDS: &'static [&'static str] = &["src_file"];
-    des.deserialize_struct("IndexedTriangles", FIELDS, ITVisitor(PhantomData))
-  }
-}
-
-#[test]
-fn test_from_ascii_obj() {
-  let p = Path::new(file!())
-    .parent()
-    .unwrap()
-    .join("sample_files")
-    .join("teapot.obj");
-  assert!(from_ascii_obj(p).is_ok());
-}
+*/

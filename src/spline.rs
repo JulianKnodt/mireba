@@ -1,4 +1,4 @@
-use crate::{
+use linalg::{
   mat::{Matrix, Matrix4},
   vec::{Vec2, Vec3, Vec4, Vector},
 };
@@ -92,10 +92,11 @@ impl<'a, D: Float> CubicSurface<'a, D, Vec3<D>> {
     let vs = cubic_comp(v.max(D::zero()).min(D::one()));
     let [xs, ys, zs] = self.components();
     let partial = weights.t().vecmul(&vs);
-    let x = weights.vecmul(&xs.vecmul(&partial)).dot(&us);
-    let y = weights.vecmul(&ys.vecmul(&partial)).dot(&us);
-    let z = weights.vecmul(&zs.vecmul(&partial)).dot(&us);
-    Vec3(x, y, z)
+    Vec3(
+      weights.vecmul(&xs.vecmul(&partial)).dot(&us),
+      weights.vecmul(&ys.vecmul(&partial)).dot(&us),
+      weights.vecmul(&zs.vecmul(&partial)).dot(&us),
+    )
   }
 }
 

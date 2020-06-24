@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
+use crate::renderable::Storage;
 
-/// A shape, material tuple for rendering
-#[derive(Debug, Serialize, Deserialize)]
+/// A serialized format for storing in a file
+#[derive(Debug, Clone)]
 pub struct Object<M, S> {
   pub mat: M,
   pub shape: S,
@@ -11,21 +11,29 @@ impl<M, S> Object<M, S> {
   pub fn new(shape: S, mat: M) -> Self { Self { shape, mat } }
 }
 
-impl<S> Object<usize, S> {
-  pub fn resolve<M>(self, ms: &[M]) -> Object<&'_ M, S> {
+impl Object<usize, usize> {
+  pub fn resolve<'m, 's, M, S>(self, ms: &'m [M], ss: &'s [S]) -> Object<&'m M, &'s S> {
     let Object { mat, shape } = self;
     Object {
       mat: &ms[mat],
-      shape,
+      shape: &ss[shape],
     }
   }
 }
 
-impl<'a, M: PartialEq, S> Object<&'a M, S> {
+impl<'m, 's, M: PartialEq, S: PartialEq> Object<&'m M, &'s S> {
   /// Attempts to dissolve this object into a indexed reference
-  pub fn dissolve(self, src: &'a [M]) -> Option<Object<usize, S>> {
+  pub fn dissolve(self, mats: &'m [M], shapes: &'s [S]) -> Option<Object<usize, usize>> {
     let Object { mat, shape } = self;
-    let pos = src.iter().position(|m| m == mat)?;
-    Some(Object { mat: pos, shape })
+    let mat_pos = mats.iter().position(|m| m == mat)?;
+    let shape_pos = shapes.iter().position(|s| s == shape)?;
+    Some(Object {
+      mat: mat_pos,
+      shape: shape_pos,
+    })
   }
+}
+
+impl From<Object<usize, usize>> for Storage {
+  fn from(o: Object<usize, usize>) -> Self { Storage::Shape(o) }
 }

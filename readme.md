@@ -1,18 +1,13 @@
-# Ray Weekend
+# Mireba (見れば)
 
-A raytracer initially built off the raytracer in a weekend file. I've added additional features
-including different objects, indexed triangle lists, and hopefully more as time goes on.
+The skeleton of a photorealistic renderer built from the ground up in rust.
 
-# TODO
+Based on Mitsuba and PBRT.
 
-- Implement some random generator for objects
-- Fix noise by implementing a better sampling strategy
-- More materials and fix existing API
-- Better sampling strategy for reflections
-- Add lights rather than just ambient
-- Add fluids
+There's still a lot to be done.
 
 
+<!--
 # Outputs
 
 ![spheres](outputs/spheres.jpg)
@@ -28,4 +23,14 @@ including different objects, indexed triangle lists, and hopefully more as time 
 ![teapot](outputs/teapot.jpg)
 ![magnolia](outputs/magnolia.jpg)
 ![box](outputs/box.jpg)
+-->
 
+
+## Name
+
+Mitsuba （三つ葉）一文字変えるは「見れば」になる。
+
+If you change one character in Mi-tsu-ba, you get Mi-re-ba.
+This renderer's general design is based off of
+[Mitsuba](https://github.com/mitsuba-renderer/mitsuba2), so I thought it was fitting.
+Also mireba means "if you can see", and hopefully Mireba will help you see virtual scenes.

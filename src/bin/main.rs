@@ -1,11 +1,14 @@
 extern crate clap;
-use clap::{App, Arg};
+use clap::{App, Arg, SubCommand};
 use gfx::{
   accelerator::naive::Naive,
   integrator::direct::Direct,
   scene::{RawScene, Scene},
 };
-use std::fs::File;
+use std::{
+  fs::File,
+  io::{BufReader, BufWriter},
+};
 
 // TODO need to setup this so it can be switched out at compile time
 /// This is the accelerator used by the render
@@ -21,7 +24,7 @@ pub fn main() {
         .short("i")
         .long("input")
         .value_name("FILE")
-        .help("Input scene file")
+        .help("Input scene file (if example is specified this is where it will be stored")
         .required(true)
         .takes_value(true),
     )
@@ -34,10 +37,23 @@ pub fn main() {
         .required(false)
         .takes_value(true),
     )
+    .subcommand(SubCommand::with_name("example").about("Creates an empty scene file"))
     .get_matches();
+
   let input_file = matches.value_of("input").unwrap();
-  let output_file = matches.value_of("output").unwrap_or("out.jpg");
+
+  if let Some(_sub) = matches.subcommand_matches("example") {
+    // Creates an example scene
+    let empty_scene = RawScene::example();
+    let f = File::create(input_file).expect("Could not create input file");
+    let f = BufWriter::new(f);
+    serde_json::to_writer_pretty(f, &empty_scene).expect("Failed to write example file");
+    return;
+  }
   let f = File::open(input_file).expect("Could not find input file");
+  let f = BufReader::new(f);
+
+  let output_file = matches.value_of("output").unwrap_or("out.jpg");
   let raw_scene: RawScene = serde_json::from_reader(f).expect("Error while reading json");
   let scene: Scene<(), Accelerator> = raw_scene.build();
   scene.render(Direct {});

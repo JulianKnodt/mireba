@@ -5,7 +5,7 @@ use crate::{
 };
 use quick_maths::{Ray, Vec2, Vec3};
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Sphere {
   center: Vec3,
   radius: f32,
@@ -19,7 +19,8 @@ impl Sphere {
     );
     Self { center, radius }
   }
-  pub fn normal(&self, v: Vec3) -> Vec3 { v - self.center }
+  /// Returns the normal from this sphere for a point in space
+  pub fn normal(&self, v: Vec3) -> Vec3 { (v - self.center).norm() }
   pub fn contains(&self, v: &Vec3) -> bool {
     (self.center - *v).sqr_magn() <= (self.radius * self.radius)
   }

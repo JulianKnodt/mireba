@@ -25,7 +25,7 @@ impl<S: SamplingIntegrator> Integrator for S {
     let position_sample =
     s.camera.sample_ray(position_sample
     */
-    let sample_count = 20;
+    let sample_count = 1;
     for i in 0..w * h {
       let (x, y) = morton_decode(i);
       if x >= w || y >= h {

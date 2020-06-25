@@ -15,6 +15,8 @@ pub mod spectrum;
 
 pub mod utils;
 
+pub mod transform;
+
 /*
 // general utility module
 pub mod util;
@@ -57,7 +59,6 @@ pub mod turtle;
 
 */
 #[cfg(test)]
-#[macro_use]
 extern crate quickcheck;
 /*
 /// Property checking for various components

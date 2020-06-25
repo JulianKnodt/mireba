@@ -1,26 +1,27 @@
 use crate::{
   accelerator::Accelerator,
-  bsdf::BSDFImpl,
-  camera::Cameras,
+  bsdf::{builder::Builder as BSDFBuilder, BSDFImpl},
+  camera::{builder::Builder as CameraBuilder, Cameras},
   integrator::Integrator,
   interaction::SurfaceInteraction,
   light::Lights,
   shapes::{ShapeImpl, Shapes},
+  spectrum::from_rgb,
 };
-use quick_maths::Ray;
+use quick_maths::{Ray, Vec3};
 use std::collections::HashMap;
 
 // TODO add Serde for RawScene
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct RawScene {
   /// List of lights
   lights: Vec<Lights>,
   /// Camera
-  camera: Cameras,
+  camera: CameraBuilder,
   /// List of shapes with optional ids
   shapes: HashMap<String, ShapeImpl>,
   /// List of BSDFs with optional ids
-  bsdfs: HashMap<String, BSDFImpl>,
+  bsdfs: HashMap<String, BSDFBuilder>,
   /// Mapping between shapes -> bsdf
   bsdf_mapping: HashMap<String, String>,
 }
@@ -38,7 +39,7 @@ impl RawScene {
     let (id_to_idx, mut bsdfs): (HashMap<_, _>, Vec<_>) = bsdfs
       .into_iter()
       .enumerate()
-      .map(|(i, (id, v))| ((id, i), v))
+      .map(|(i, (id, v))| ((id, i), v.into()))
       .unzip();
     let shapes = shapes.into_iter().map(|(shape_id, shape_impl)| {
       let idx = id_to_idx[&bsdf_mapping[&shape_id]];
@@ -46,10 +47,51 @@ impl RawScene {
     });
     Scene {
       lights,
-      camera,
+      camera: camera.into(),
       env_light: None,
       accelerator: Acc::build(shapes),
       bsdfs,
+    }
+  }
+  /// Creates an example
+  pub fn example() -> Self {
+    let lights = vec![Lights::Point(crate::light::point::Point::new(
+      Vec3::new(0.0, 1.0, -1.0),
+      10.0,
+      from_rgb(Vec3::new(0.3, 0.7, 0.9)),
+    ))];
+    let mut shapes = HashMap::new();
+    shapes.insert(
+      String::from("central_sphere"),
+      ShapeImpl::Sphere(crate::shapes::sphere::Sphere::new(
+        Vec3::new(0.0, 0.0, 3.0),
+        1.0,
+      )),
+    );
+    let mut bsdfs = HashMap::new();
+    bsdfs.insert(String::from("debug"), BSDFBuilder::Debug);
+    let mut bsdf_mapping = HashMap::new();
+    bsdf_mapping.insert(String::from("central_sphere"), String::from("debug"));
+    Self {
+      lights,
+      camera: CameraBuilder {
+        film_builder: crate::film::builder::Builder { size: (512, 512) },
+        to_world: crate::transform::Builder::LookAt {
+          origin: Vec3::of(0.0),
+          towards: Vec3::new(0., 0., 1.),
+          up: Vec3::new(0., 1., 0.),
+        },
+        variant: crate::camera::builder::Variant::Perspective {
+          x_fov: 30.0,
+          near_clip: 1.0e-3,
+          far_clip: 1.0e3,
+          aspect: 1.0,
+        },
+      },
+      // TODO fill in examples here
+      shapes,
+      bsdfs,
+      bsdf_mapping,
     }
   }
 }

@@ -24,8 +24,8 @@ impl SamplingIntegrator for Direct {
 
     // Attempt to compute direct lighting in scene
     for l in &scene.lights {
-      let (ray, spectrum) = l.sample_towards(&si.it);
-      if spectrum.is_zero() {
+      let (ray, emitted_light) = l.sample_towards(&si.it);
+      if emitted_light.is_zero() {
         continue;
       }
       if let Some((_, l_s)) = scene.intersect_ray(&ray) {
@@ -35,7 +35,8 @@ impl SamplingIntegrator for Direct {
       }
       let bsdf = s.bsdf();
       // add light from direct sources and ensure it's not negative
-      result += (bsdf.eval(&si, -ray.dir) * spectrum).max(0.);
+      let reflected = bsdf.eval(&si, -ray.dir);
+      result += (reflected * emitted_light).max(0.);
     }
     result
   }

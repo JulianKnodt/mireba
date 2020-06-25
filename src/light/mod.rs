@@ -14,7 +14,7 @@ pub trait Light: Debug {
 
 // pub mod point;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum Lights {
   Point(point::Point),
 }

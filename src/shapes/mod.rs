@@ -10,7 +10,7 @@ pub trait Shape: Debug {
 }
 
 /// List of all currently allowed shapes
-#[derive(Debug, PartialEq, serde::Deserialize)]
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum ShapeImpl {
   Sphere(sphere::Sphere),
   /*

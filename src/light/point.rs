@@ -3,7 +3,7 @@ use crate::{interaction::Interaction, spectrum::Spectrum};
 use quick_maths::{Ray, Vec3};
 
 /// Represents a point light source
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Point {
   /// Position of this light
   pos: Vec3,
@@ -15,11 +15,24 @@ pub struct Point {
   spectrum: Spectrum,
 }
 
+impl Point {
+  pub fn new(pos: Vec3, intensity: f32, spectrum: Spectrum) -> Self {
+    Self {
+      pos,
+      intensity,
+      spectrum,
+    }
+  }
+}
+
 impl Light for Point {
   fn sample_towards(&self, it: &Interaction) -> (Ray, Spectrum) {
     let d = it.p - self.pos;
     let dist = d.magn();
-    (Ray::new(self.pos, d / dist), self.spectrum / (dist * dist))
+    (
+      Ray::new(self.pos, d / dist),
+      self.spectrum * self.intensity / (dist * dist),
+    )
   }
 }
 

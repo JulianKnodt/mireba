@@ -1,12 +1,15 @@
+pub mod blocks;
+pub mod builder;
+
 use crate::{
   spectrum::Spectrum,
   utils::{morton_decode, morton_encode},
 };
 use image::{DynamicImage, GenericImage, Rgba};
-use quick_maths::{Vec2, Vec3, Vector};
+use quick_maths::{Vec2, Vec3, Vector, Zero};
 use std::{fmt::Debug, sync::RwLock};
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug)]
 pub struct Film {
   pub size: Vec2<u32>,
   // TODO replace this backend?
@@ -21,6 +24,10 @@ impl Film {
     }
   }
   pub fn write(&self, uv: Vec2, val: Spectrum) {
+    if val.is_zero() {
+      // don't need to acquire lock if writing nothing
+      return;
+    }
     let Vector([x, y]) = uv * self.size.apply_fn(|v| v as f32);
     self.storage.write().unwrap()[morton_encode(x as u32, y as u32) as usize] = val;
   }
@@ -30,7 +37,7 @@ impl Film {
     let mut img = DynamicImage::new_rgb8(self.size.x(), self.size.y());
     for (i, &v) in self.storage.read().unwrap().iter().enumerate() {
       let (x, y) = morton_decode(i as u32);
-      let Vector([r, g, b]) = (v * 255.).max(255.);
+      let Vector([r, g, b]) = (v * 255.).min(255.);
       img.put_pixel(x, y, Rgba([r as u8, g as u8, b as u8, 255]));
     }
     img
@@ -72,5 +79,3 @@ impl ImageBlock {
     })
   }
 }
-
-pub mod blocks;

@@ -122,7 +122,7 @@ impl Bounds3 {
 #[cfg(test)]
 mod bounds_test {
   use super::Bounds3;
-  use quick_maths::{Ray, Vec3};
+  use quick_maths::Ray;
   use quickcheck::{quickcheck, TestResult};
   quickcheck! {
     // Tests that a ray that lands inside the box will correctly intersect the box

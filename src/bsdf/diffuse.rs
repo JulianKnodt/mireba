@@ -2,9 +2,13 @@ use super::BSDF;
 use crate::{interaction::SurfaceInteraction, spectrum::Spectrum};
 use quick_maths::Vec3;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Diffuse {
   reflectance: Spectrum,
+}
+
+impl Diffuse {
+  pub fn new(reflectance: Spectrum) -> Self { Self { reflectance } }
 }
 
 impl BSDF for Diffuse {

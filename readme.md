@@ -28,7 +28,7 @@ There's still a lot to be done.
 
 ## Name
 
-Mitsuba （三つ葉）一文字変えるは「見れば」になる。
+Mitsuba （三つ葉）一文字変えれば「見れば」になる。
 
 If you change one character in Mi-tsu-ba, you get Mi-re-ba.
 This renderer's general design is based off of

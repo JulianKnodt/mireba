@@ -37,7 +37,7 @@ impl Film {
     let mut img = DynamicImage::new_rgb8(self.size.x(), self.size.y());
     for (i, &v) in self.storage.read().unwrap().iter().enumerate() {
       let (x, y) = morton_decode(i as u32);
-      let Vector([r, g, b]) = (v * 255.).min(255.);
+      let Vector([r, g, b]) = (v * 255.).powf(2.2).min(255.);
       img.put_pixel(x, y, Rgba([r as u8, g as u8, b as u8, 255]));
     }
     img

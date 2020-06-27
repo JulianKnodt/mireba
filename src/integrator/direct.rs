@@ -28,8 +28,8 @@ impl SamplingIntegrator for Direct {
       if emitted_light.is_zero() {
         continue;
       }
-      if let Some((_, l_s)) = scene.intersect_ray(&ray) {
-        if l_s != s {
+      if let Some((l_si, _)) = scene.intersect_ray(&ray) {
+        if si.it.t >= l_si.it.t + 0.001 {
           continue;
         }
       }

@@ -1,47 +1,65 @@
-use linalg::num::Float;
-use linalg::vec::{Ray, Vec3, Vector};
-use crate::{
-  vis::{Visibility, Visible},
-};
+use super::Shape;
+use crate::interaction::{Interaction, SurfaceInteraction};
+use quick_maths::{Ray, Vec2, Vec3, Vector, Zero};
 
 /// Represents a plane in 3d space
 /// Defined by the equation (P * NormaL) + w = 0
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Plane<D> {
-  /// Normal to the plane
-  normal: Vec3<D>,
-  /// Offset of the plane from the origin
-  w: D,
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Plane {
+  /// Point on the plane
+  normal: Vec3,
+
+  w: f32,
+
+  /// Up on plane
+  up: Vec3,
+  /// right on plane
+  right: Vec3,
+  // normal is right x up
 }
 
-impl<D: Float> Plane<D> {
-  pub fn new(normal: Vec3<D>, w: D) -> Self {
+impl Plane {
+  pub fn new(normal: &Vec3, w: f32, up: &Vec3, width: f32, height: f32) -> Self {
     let normal = normal.norm();
-    Self { normal, w }
+    // rebuild
+    let right = normal.cross(&up).norm();
+    let up = up.cross(&normal).norm();
+    Self {
+      normal,
+      w,
+      right: right * width,
+      up: up * height,
+    }
   }
   /// Returns a representative point on this plane
-  pub fn repr_point(&self) -> Vec3<D> { -(self.normal * self.w) / self.normal.sqr_magn() }
-  #[inline]
-  pub fn on_plane(&self, v: &Vec3<D>) -> bool {
-    self.normal.dot(v) + self.w < D::from(0.001).unwrap()
+  pub fn repr_point(&self) -> Vec3 { -self.normal * self.w }
+  pub fn on_plane(&self, v: &Vec3) -> bool { self.normal.dot(v) + self.w < 0.001 }
+  fn uv(&self, Vector([x, y, _]): &Vec3) -> Vec2 {
+    let Vector([rx, ry, _]) = self.right;
+    let Vector([ux, uy, _]) = self.up;
+    // [norm, right, up] * [0, u, v] = [x,y,z]
+    let v = x / (ux - rx / ry * uy);
+    let u = (y - uy * v) / rx;
+    Vec2::new(u, v)
   }
 }
 
-impl<D: Float> Visible<D> for Plane<D> {
-  fn hit(&self, r: &Ray<D>) -> Option<Visibility<D>> {
+impl Shape for Plane {
+  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
     let d = self.normal.dot(&r.dir);
     if d.is_zero() {
       return None;
     }
-    let param = -(r.pos.dot(&self.normal) + self.w) / d;
-    if param.is_sign_negative() {
+    let t = -(r.pos.dot(&self.normal) + self.w) / d;
+    if t.is_sign_negative() {
       return None;
     }
-    let pos = r.at(param);
-    Some(Visibility {
-      pos,
-      param,
-      norm: self.normal,
+    let p = r.at(t);
+    Some(SurfaceInteraction {
+      it: Interaction { t, p },
+      normal: self.normal,
+      uv: self.uv(&p),
+      wi: r.dir,
     })
   }
 }

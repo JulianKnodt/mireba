@@ -1,5 +1,5 @@
 use quick_maths::{num::Float, Ray, Vec3, Vector};
-use std::array::LengthAtMost32;
+use std::fmt::Debug;
 
 fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
   a_max > b_min && b_max > a_min
@@ -7,9 +7,7 @@ fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
 
 /// Axis Aligned bounding box
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Bounds<const N: usize>
-where
-  [f32; N]: LengthAtMost32, {
+pub struct Bounds<const N: usize> {
   pub min: Vector<f32, N>,
   pub max: Vector<f32, N>,
 }
@@ -17,10 +15,7 @@ where
 pub type Bounds3 = Bounds<3>;
 pub type Bounds2 = Bounds<2>;
 
-impl<const N: usize> Bounds<N>
-where
-  [f32; N]: LengthAtMost32,
-{
+impl<const N: usize> Bounds<N> {
   pub fn new(min: Vector<f32, N>, max: Vector<f32, N>) -> Self { Self { min, max } }
   pub fn valid(a: Vector<f32, N>, b: Vector<f32, N>) -> Self {
     let (min, max) = a.sift(&b);
@@ -86,25 +81,31 @@ impl Bounds3 {
     let t_max = (thx.max(tlx)).min(thy.max(tly)).min(thz.max(tlz));
 
     if t_max >= t_min.max(0.0) {
-      let t = if t_min.is_sign_positive() {
-        t_min
+      let (t, is_max) = if t_min.is_sign_positive() {
+        (t_min, false)
       } else {
-        t_max
+        (t_max, true)
       };
 
       let l = 1.0;
       let o = 0.0;
       let (i, j, k) = match t {
+        #[allow(clippy::float_cmp)]
         _ if t == thx => (l, o, o),
+        #[allow(clippy::float_cmp)]
         _ if t == tlx => (-l, o, o),
+        #[allow(clippy::float_cmp)]
         _ if t == thy => (o, l, o),
+        #[allow(clippy::float_cmp)]
         _ if t == tly => (o, -l, o),
+        #[allow(clippy::float_cmp)]
         _ if t == thz => (o, o, l),
+        #[allow(clippy::float_cmp)]
         _ if t == tlz => (o, o, -l),
         _ => unreachable!(),
       };
       let norm = Vec3::new(i, j, k);
-      let norm = if t == t_max { -norm } else { norm };
+      let norm = if is_max { -norm } else { norm };
 
       return Some((t, norm));
     }
@@ -117,6 +118,10 @@ impl Bounds3 {
     let Vector([ohx, ohy, ohz]) = o.max;
     overlaps_1d(lx, hx, olx, ohx) && overlaps_1d(ly, hy, oly, ohy) && overlaps_1d(lz, hz, olz, ohz)
   }
+}
+
+pub trait Bounded: Debug {
+  fn bounds(&self) -> &Bounds3;
 }
 
 #[cfg(test)]

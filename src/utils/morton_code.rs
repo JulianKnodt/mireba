@@ -1,6 +1,8 @@
 // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
 pub const fn compact_1_by_1(mut v: u32) -> u32 {
+  // every other bit
   v &= 0x55555555; // v = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+                   // compress every 4 bits together
   v = (v ^ (v >> 1)) & 0x33333333; // v = --fe --dc --ba --98 --76 --54 --32 --10
   v = (v ^ (v >> 2)) & 0x0f0f0f0f; // v = ---- fedc ---- ba98 ---- 7654 ---- 3210
   v = (v ^ (v >> 4)) & 0x00ff00ff; // v = ---- ---- fedc ba98 ---- ---- 7654 3210

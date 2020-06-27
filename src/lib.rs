@@ -9,6 +9,7 @@ pub mod film;
 pub mod integrator;
 pub mod interaction;
 pub mod light;
+pub mod sampler;
 pub mod scene;
 pub mod shapes;
 pub mod spectrum;
@@ -16,6 +17,9 @@ pub mod spectrum;
 pub mod utils;
 
 pub mod transform;
+
+// TODO create cfg for just 2d
+pub mod two_d;
 
 /*
 // general utility module

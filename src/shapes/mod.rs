@@ -1,6 +1,11 @@
-// use quick_maths::{Vec2, Vec3};
+pub mod builder;
+pub use builder::Builder;
+pub mod obj;
+pub mod plane;
+pub mod sphere;
+
 use crate::{bsdf::BSDFImpl, interaction::SurfaceInteraction};
-use quick_maths::Ray;
+use quick_maths::{Ray, Transform4};
 use std::{fmt::Debug, ptr::NonNull};
 
 /// Generic shape trait
@@ -11,7 +16,7 @@ pub trait Shape: Debug {
 
 /// List of all currently allowed shapes
 #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
-pub enum ShapeImpl {
+pub enum Variant {
   Sphere(sphere::Sphere),
   /*
   Plane,
@@ -19,25 +24,36 @@ pub enum ShapeImpl {
   */
 }
 
+/// Intermediate shape representation with no bsdf
+#[derive(Debug)]
+pub struct Geometry {
+  to_world: Transform4,
+  variant: Variant,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Shapes {
-  shape_impl: ShapeImpl,
+  variant: Variant,
+  to_world: Transform4,
   /// Pointer into the list of non-null bsdfs
   bsdf: NonNull<BSDFImpl>,
 }
 
 impl Shapes {
-  pub fn new(shape_impl: ShapeImpl, bsdf: &mut BSDFImpl) -> Self {
+  pub fn new(si: Geometry, bsdf: &mut BSDFImpl) -> Self {
     let bsdf = unsafe { NonNull::new_unchecked(bsdf) };
-    Self { shape_impl, bsdf }
+    let Geometry { to_world, variant } = si;
+    Self {
+      variant,
+      to_world,
+      bsdf,
+    }
   }
   pub fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
-    use ShapeImpl::*;
-    match &self.shape_impl {
+    use Variant::*;
+    match &self.variant {
       Sphere(s) => s.intersect_ray(r),
     }
   }
   pub fn bsdf(&self) -> &BSDFImpl { unsafe { self.bsdf.as_ref() } }
 }
-
-pub mod sphere;

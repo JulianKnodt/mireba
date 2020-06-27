@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Triangle<V = Vec3<f32>>(pub Vec3<V>);
+pub struct Triangle<V = Vec3>(pub Vec3<V>);
 
 impl<T: Float> Triangle<Vec3<T>> {
   // Takes an owned triangle and converts it into a triangle of references
@@ -20,20 +20,17 @@ impl<T: Float> Triangle<Vec3<T>> {
   }
 }
 
-impl<'a, T: Float> Triangle<&'a Vec3<T>> {
-  #[inline]
-  pub fn edge0(&self) -> Vec3<T> { (self.0).1 - (self.0).0 }
-  #[inline]
-  pub fn edge1(&self) -> Vec3<T> { (self.0).2 - (self.0).1 }
-  #[inline]
-  pub fn edge2(&self) -> Vec3<T> { (self.0).0 - (self.0).2 }
+impl<'a> Triangle<&'a Vec3> {
+  pub fn edge0(&self) -> Vec3 { (self.0).y() - (self.0).x() }
+  pub fn edge1(&self) -> Vec3 { (self.0).z() - (self.0).y() }
+  pub fn edge2(&self) -> Vec3 { (self.0).x() - (self.0).z() }
   /// Returns a non-unit normal to this triangle
-  #[inline]
   pub fn normal(&self) -> Vec3<T> {
     let e0 = self.edge0();
     let e1 = self.edge1();
     e0.cross(&e1)
   }
+/*
   /// Intersection type 2
   pub fn intersect2(&self, r: &Ray<T>) -> Option<Visibility<T>> {
     let norm = self.normal().norm();
@@ -89,14 +86,14 @@ impl<'a, T: Float> Triangle<&'a Vec3<T>> {
       norm: self.normal().norm(),
     })
   }
-  #[inline]
-  pub fn area(&self) -> T { self.edge0().cross(&self.edge1()).magn() / (T::from(2.0).unwrap()) }
+*/
+  pub fn area(&self) -> f32 { self.edge0().cross(&self.edge1()).magn() / (T::from(2.0).unwrap()) }
   /// Returns two barycentric coordinates for a point, but performs no checks whether it is in
   /// bounds or not
-  pub fn barycentric(&self, p: &Vec3<T>) -> Vec2<T> {
+  pub fn barycentric(&self, p: &Vec3) -> Vec2 {
     // https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates
     // a weird permutation to get the result to match the triangle verts.
-    let &Triangle(Vec3(v1, v2, v0)) = self;
+    let &Self(Vector([v1, v2, v0])) = self;
     let e0 = v1 - v0;
     let e1 = v2 - v0;
     let e2 = p - v0;
@@ -108,22 +105,23 @@ impl<'a, T: Float> Triangle<&'a Vec3<T>> {
     let denom = d00 * d11 - d01 * d01;
     let alpha = (d11 * d20 - d01 * d21) / denom;
     let beta = (d00 * d21 - d01 * d20) / denom;
-    Vec2(alpha, beta)
+    Vec2::new(alpha, beta)
   }
   /// Returns the point on this triangle where this barycentric coordinate is
   #[inline]
-  pub fn point_from_barycentric(&self, b: &Vec3<T>) -> Vec3<T> {
+  pub fn point_from_barycentric(&self, b: &Vec3) -> Vec3 {
     *(self.0).0 * b.0 + *(self.0).1 * b.1 + *(self.0).2 * b.2
   }
-  pub fn contains(&self, v: &Vec3<T>) -> bool { self.barycentric(&v).is_valid_barycentric() }
+  // pub fn contains(&self, v: &Vec3) -> bool { self.barycentric(&v).is_valid_barycentric() }
 }
 
 impl<'a, T: Float> Bounded<Vec3<T>> for Triangle<&'a Vec3<T>> {
   #[inline]
   fn bounds(&self) -> Bounds<Vec3<T>> {
-    let Triangle(Vec3(v0, v1, v2)) = self;
-    let min = v0.min_parts(v1).min_parts(v2);
-    let max = v0.max_parts(v1).max_parts(v2);
+    let Triangle(Vector([v0, v1, v2])) = self;
+    let (min, max) = v0.sift(&v1);
+    let (min, _) = min.sift(&v2);
+    let (_, max) = max.sift(&v2);
     Bounds::new([min, max])
   }
 }

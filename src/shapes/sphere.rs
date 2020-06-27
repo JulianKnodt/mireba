@@ -29,10 +29,9 @@ impl Sphere {
 impl Shape for Sphere {
   fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
     let from_sphere = r.pos - self.center;
-    let a = r.dir.sqr_magn();
     let b = 2.0 * r.dir.dot(&from_sphere);
     let c = from_sphere.sqr_magn() - self.radius * self.radius;
-    quad_solve(a, b, c)
+    quad_solve(r.dir.sqr_magn(), b, c)
       .and_then(
         |(t0, t1)| match (t0.is_sign_positive(), t1.is_sign_positive()) {
           (true, true) => Some(t0.min(t1)),

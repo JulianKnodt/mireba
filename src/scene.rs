@@ -5,8 +5,9 @@ use crate::{
   integrator::Integrator,
   interaction::SurfaceInteraction,
   light::Lights,
-  shapes::{ShapeImpl, Shapes},
+  shapes::{Builder as ShapeBuilder, Shapes},
   spectrum::from_rgb,
+  transform::Builder as TransformBuilder,
 };
 use quick_maths::{Ray, Vec3};
 use std::collections::HashMap;
@@ -19,7 +20,7 @@ pub struct RawScene {
   /// Camera
   camera: CameraBuilder,
   /// List of shapes with optional ids
-  shapes: HashMap<String, ShapeImpl>,
+  shapes: HashMap<String, ShapeBuilder>,
   /// List of BSDFs with optional ids
   bsdfs: HashMap<String, BSDFBuilder>,
   /// Mapping between shapes -> bsdf
@@ -41,9 +42,9 @@ impl RawScene {
       .enumerate()
       .map(|(i, (id, v))| ((id, i), v.into()))
       .unzip();
-    let shapes = shapes.into_iter().map(|(shape_id, shape_impl)| {
+    let shapes = shapes.into_iter().map(|(shape_id, shape_builder)| {
       let idx = id_to_idx[&bsdf_mapping[&shape_id]];
-      Shapes::new(shape_impl, &mut bsdfs[idx])
+      Shapes::new(shape_builder.into(), &mut bsdfs[idx])
     });
     Scene {
       lights,
@@ -61,22 +62,25 @@ impl RawScene {
       from_rgb(Vec3::new(0.3, 0.7, 0.9)),
     ))];
     let mut shapes = HashMap::new();
-    shapes.insert(
-      String::from("central_sphere"),
-      ShapeImpl::Sphere(crate::shapes::sphere::Sphere::new(
-        Vec3::new(0.0, 0.0, 3.0),
-        1.0,
-      )),
-    );
+    shapes.insert(String::from("central_sphere"), ShapeBuilder {
+      to_world: TransformBuilder::Identity,
+      variant: crate::shapes::builder::Variant::Sphere {
+        center: Vec3::new(0., 0., 10.),
+        radius: 1.0,
+      },
+    });
     let mut bsdfs = HashMap::new();
-    bsdfs.insert(String::from("debug"), BSDFBuilder::Debug);
+    bsdfs.insert(
+      String::from("debug"),
+      BSDFBuilder::Diffuse(from_rgb(Vec3::new(0.7, 0.8, 0.5))),
+    );
     let mut bsdf_mapping = HashMap::new();
     bsdf_mapping.insert(String::from("central_sphere"), String::from("debug"));
     Self {
       lights,
       camera: CameraBuilder {
         film_builder: crate::film::builder::Builder { size: (512, 512) },
-        to_world: crate::transform::Builder::LookAt {
+        to_world: TransformBuilder::LookAt {
           origin: Vec3::of(0.0),
           towards: Vec3::new(0., 0., 1.),
           up: Vec3::new(0., 1., 0.),

@@ -1,5 +1,6 @@
 use super::Shape;
 use crate::{
+  bounds::{Bounded, Bounds3},
   interaction::{Interaction, SurfaceInteraction},
   utils::quad_solve,
 };
@@ -53,18 +54,16 @@ impl Shape for Sphere {
       })
   }
 }
-/*
-*/
 
-/*
-impl<D: Float> Bounded<Vec3<D>> for Sphere<D> {
-  fn bounds(&self) -> Bounds<Vec3<D>> {
+impl Bounded for Sphere {
+  fn bounds(&self) -> Bounds3 {
     let min = self.center - self.radius;
     let max = self.center + self.radius;
-    Bounds::new([min, max])
+    Bounds3::new(min, max)
   }
 }
 
+/*
 #[cfg(test)]
 mod test_sphere {
   use super::Sphere;

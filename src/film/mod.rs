@@ -11,11 +11,15 @@ use image::{DynamicImage, GenericImage, Rgba};
 use quick_maths::{Vec2, Vec3, Vector, Zero};
 use std::{fmt::Debug, sync::RwLock};
 
-#[derive(Debug)]
 pub struct Film {
   pub size: Vec2<u32>,
   // TODO replace this backend?
   storage: RwLock<Vec<Spectrum>>,
+}
+
+use std::fmt;
+impl fmt::Debug for Film {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { self.size.fmt(f) }
 }
 
 impl Film {

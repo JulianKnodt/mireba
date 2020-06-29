@@ -1,5 +1,6 @@
-use super::{perspective::Perspective, Cameras, Variant as CameraVariant};
-use crate::film::Film;
+use super::{
+  orthographic::Orthographic, perspective::Perspective, Cameras, Variant as CameraVariant,
+};
 use quick_maths::Transform4;
 
 /// Camera Builder
@@ -18,6 +19,12 @@ pub enum Variant {
     far_clip: f32,
     aspect: f32,
   },
+
+  Orthographic {
+    near_clip: f32,
+    far_clip: f32,
+    aspect: f32,
+  },
 }
 
 impl From<Builder> for Cameras {
@@ -27,7 +34,6 @@ impl From<Builder> for Cameras {
       to_world,
       variant,
     } = b;
-    let film: Film = film_builder.into();
     let to_world: Transform4 = to_world.into();
     let variant = match variant {
       Variant::Perspective {
@@ -36,11 +42,16 @@ impl From<Builder> for Cameras {
         far_clip,
         aspect,
       } => CameraVariant::Perspective(Perspective::new(x_fov, near_clip, far_clip, aspect)),
+      Variant::Orthographic {
+        near_clip,
+        far_clip,
+        aspect,
+      } => CameraVariant::Orthographic(Orthographic::new(near_clip, far_clip, aspect)),
     };
     Cameras {
       from_world: to_world.inv(),
       to_world,
-      film,
+      film: film_builder.into(),
       variant,
     }
   }

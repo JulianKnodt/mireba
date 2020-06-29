@@ -1,8 +1,6 @@
 extern crate clap;
 use clap::{App, Arg, SubCommand};
-use gfx::two_d::{
-  scene::{RawScene, Scene},
-};
+use gfx::two_d::scene::{RawScene, Scene};
 use std::{
   fs::File,
   io::{BufReader, BufWriter},

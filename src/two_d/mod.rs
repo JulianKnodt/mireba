@@ -2,8 +2,7 @@ pub mod lgram;
 pub mod scene;
 pub mod turtle;
 
-use crate::film::Film;
-use crate::spectrum::from_rgb;
+use crate::{film::Film, spectrum::from_rgb};
 use quick_maths::Vec3;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -28,7 +27,7 @@ pub enum Consumer {
 impl Consumer {
   pub fn consume(&mut self, p: &Producer, film: &mut Film) {
     match self {
-      Consumer::Turtle(turt) => {
+      Consumer::Turtle(turt) =>
         for &i in p.items() {
           let curr = turt.curr_pos();
           turt.follow_raw(i);
@@ -36,8 +35,7 @@ impl Consumer {
           if curr != next {
             film.line(from_rgb(Vec3::new(0.5, 0.5, 0.5)), curr, next);
           }
-        }
-      },
+        },
     }
   }
 }

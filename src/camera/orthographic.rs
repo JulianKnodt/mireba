@@ -2,21 +2,22 @@ use super::{projective::Projective, Camera};
 use quick_maths::{Ray, Transform4, Vec2, Vec3};
 
 #[derive(Debug)]
-pub struct Perspective(Projective);
+pub struct Orthographic(Projective);
 
-impl Perspective {
-  pub fn new(x_fov: f32, near: f32, far: f32, aspect: f32) -> Self {
+impl Orthographic {
+  pub fn new(near: f32, far: f32, aspect: f32) -> Self {
     let camera_to_raster = Transform4::scale(Vec3::new(-0.5, 0.5 * aspect, 1.0))
       * Transform4::translate(Vec3::new(-1., 1. * aspect, 0.))
-      * Transform4::perspective(x_fov, near, far);
+      * Transform4::orthographic(near, far);
     Self(Projective::new(camera_to_raster))
   }
 }
 
-impl Camera for Perspective {
+impl Camera for Orthographic {
   fn sample_ray(&self, sample_pos: Vec2) -> Ray { self.0.sample_ray(sample_pos) }
 }
 
+/*
 #[test]
 fn perspective_camera_test() {
   use quick_maths::Zero;
@@ -36,3 +37,4 @@ fn perspective_camera_test() {
   assert_eq!(lr.y(), ur.y());
   assert_eq!(ul.sqr_magn(), 1.0);
 }
+*/

@@ -1,5 +1,8 @@
 use super::Shape;
-use crate::interaction::{Interaction, SurfaceInteraction};
+use crate::{
+  bounds::{Bounded, Bounds3},
+  interaction::{Interaction, SurfaceInteraction},
+};
 use quick_maths::{Ray, Vec2, Vec3, Vector, Zero};
 
 /// Represents a plane in 3d space
@@ -27,8 +30,8 @@ impl Plane {
     Self {
       normal,
       w,
-      right: right * width,
-      up: up * height,
+      right: right * width / 2.,
+      up: up * height / 2.,
     }
   }
   /// Returns a representative point on this plane
@@ -61,6 +64,14 @@ impl Shape for Plane {
       uv: self.uv(&p),
       wi: r.dir,
     })
+  }
+}
+
+impl Bounded for Plane {
+  fn bounds(&self) -> Bounds3 {
+    let c = self.repr_point();
+    let delta = self.right + self.up + (self.normal * 0.00001);
+    Bounds3::valid(c - delta, c + delta)
   }
 }
 

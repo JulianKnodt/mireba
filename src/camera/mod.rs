@@ -1,4 +1,5 @@
 pub mod builder;
+pub mod orthographic;
 pub mod perspective;
 pub mod projective;
 
@@ -28,6 +29,7 @@ pub struct Cameras {
 #[derive(Debug)]
 pub enum Variant {
   Perspective(perspective::Perspective),
+  Orthographic(orthographic::Orthographic),
   // TODO add camera instances here
 }
 
@@ -37,6 +39,7 @@ impl Cameras {
     use Variant::*;
     let local_ray = match &self.variant {
       Perspective(c) => c.sample_ray(sample_pos),
+      Orthographic(o) => o.sample_ray(sample_pos),
     };
     self.to_world.apply_ray(&local_ray)
   }

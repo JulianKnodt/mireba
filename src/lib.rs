@@ -1,6 +1,8 @@
 #![allow(incomplete_features)]
 #![feature(const_generics, const_generic_impls_guard)]
 
+pub const EPS: f32 = 0.000001;
+
 pub mod accelerator;
 pub mod bounds;
 pub mod bsdf;
@@ -13,6 +15,7 @@ pub mod sampler;
 pub mod scene;
 pub mod shapes;
 pub mod spectrum;
+pub mod texture;
 
 pub mod utils;
 

@@ -1,4 +1,4 @@
-use quick_maths::{num::Float, Ray, Vec3, Vector};
+use quick_maths::{Float, Ray, Vec3, Vector, Zero};
 use std::fmt::Debug;
 
 fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
@@ -24,6 +24,16 @@ impl<const N: usize> Bounds<N> {
   /// Returns whether this bounding box contains the other.
   /// If they have the same coordinates for one of the sides it will still return true
   pub fn contains(&self, o: &Self) -> bool { self.max >= o.max && self.min <= o.min }
+
+  pub fn contains_vec(&self, o: &Vector<f32, N>) -> bool {
+    for i in 0..N {
+      if self.min[i] > o[i] || self.max[i] < o[i] {
+        return false;
+      }
+    }
+    true
+  }
+
   /// whether or not this bounding box contains a vector
   /// Returns whether edges of the other bounding box are fully contained in this one.
   pub fn strictly_contains(&self, o: &Self) -> bool { self.max > o.max && self.min < o.min }
@@ -34,6 +44,8 @@ impl<const N: usize> Bounds<N> {
     let (_, max) = self.max.sift(&o.max);
     Self::new(min, max)
   }
+  pub fn center(&self) -> Vector<f32, N> { Vector::with(|i| (self.min[i] + self.max[i]) / 2.0) }
+  pub fn empty() -> Self { Bounds::new(Vector::zero(), Vector::zero()) }
 }
 
 impl Bounds3 {
@@ -46,7 +58,7 @@ impl Bounds3 {
   }
   /// Returns whether this bounding box intersects this ray.
   /// Can possibly intersect backwards.
-  pub fn intersects_ray(&self, r: &Ray) -> bool {
+  pub fn intersect_ray(&self, r: &Ray) -> bool {
     let Vector([lx, ly, lz]) = self.min;
     let Vector([hx, hy, hz]) = self.max;
     let Vector([px, py, pz]) = &r.pos;
@@ -59,13 +71,6 @@ impl Bounds3 {
     let t_max = (thx.max(tlx)).min(thy.max(tly)).min(thz.max(tlz));
 
     t_max >= t_min.max(0.0)
-  }
-  #[inline]
-  pub fn contains_vec(&self, v: &Vec3) -> bool {
-    let &Vector([x, y, z]) = v;
-    let Vector([hx, hy, hz]) = self.max;
-    let Vector([lx, ly, lz]) = self.min;
-    hx >= x && x >= lx && hy >= y && y >= ly && hz >= z && z >= lz
   }
   /// Computes the distance from a ray to the box and also the normal to the box
   pub fn intersects_ray_params(&self, r: &Ray) -> Option<(f32, Vec3)> {
@@ -118,10 +123,48 @@ impl Bounds3 {
     let Vector([ohx, ohy, ohz]) = o.max;
     overlaps_1d(lx, hx, olx, ohx) && overlaps_1d(ly, hy, oly, ohy) && overlaps_1d(lz, hz, olz, ohz)
   }
+  pub fn octants(&self) -> [Self; 8] {
+    let Vector([mx, my, mz]) = self.center();
+    let Vector([lx, ly, lz]) = self.min;
+    let Vector([ux, uy, uz]) = self.max;
+    [
+      Self::new(Vec3::new(lx, ly, lz), Vec3::new(mx, my, mz)),
+      Self::new(Vec3::new(mx, ly, lz), Vec3::new(ux, my, mz)),
+      Self::new(Vec3::new(lx, my, lz), Vec3::new(mx, uy, mz)),
+      Self::new(Vec3::new(lx, ly, mz), Vec3::new(mx, my, uz)),
+      //
+      Self::new(Vec3::new(lx, my, mz), Vec3::new(mx, uy, uz)),
+      Self::new(Vec3::new(mx, ly, mz), Vec3::new(ux, my, uz)),
+      Self::new(Vec3::new(mx, my, lz), Vec3::new(ux, uy, mz)),
+      Self::new(Vec3::new(mx, my, mz), Vec3::new(ux, uy, uz)),
+    ]
+  }
+  /// Returns the octant which this point is in, assuming that the point is in the bounds
+  pub fn octant_of(&self, v: &Vec3) -> u8 {
+    let &Vector([x, y, z]) = v;
+    let Vector([lx, ly, lz]) = self.min;
+    let Vector([ux, uy, uz]) = self.max;
+    (((x < (lx + ux) / 2.) as u8) << 2)
+      | (((y < (ly + uy) / 2.) as u8) << 1)
+      | (((z < (lz + uz) / 2.) as u8) << 0)
+  }
+  pub const fn octant_order(&self) -> [u8; 8] {
+    [
+      (0 << 2) | (0 << 1) | (0 << 0),
+      (1 << 2) | (0 << 1) | (0 << 0),
+      (0 << 2) | (1 << 1) | (0 << 0),
+      (0 << 2) | (0 << 1) | (1 << 0),
+      //
+      (0 << 2) | (1 << 1) | (1 << 0),
+      (1 << 2) | (0 << 1) | (1 << 0),
+      (1 << 2) | (1 << 1) | (0 << 0),
+      (1 << 2) | (1 << 1) | (1 << 0),
+    ]
+  }
 }
 
 pub trait Bounded: Debug {
-  fn bounds(&self) -> &Bounds3;
+  fn bounds(&self) -> Bounds3;
 }
 
 #[cfg(test)]

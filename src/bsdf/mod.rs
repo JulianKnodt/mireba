@@ -1,6 +1,8 @@
 pub mod builder;
+pub use builder::Builder;
 pub mod debug;
 pub mod diffuse;
+pub mod phong;
 
 use crate::{interaction::SurfaceInteraction, spectrum::Spectrum};
 use quick_maths::Vec3;

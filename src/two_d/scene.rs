@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use super::{lgram::LGrammar, turtle::Builder as TurtleBuilder, Consumer, Producer};
 use crate::film::{Builder as FilmBuilder, Film};
 use quick_maths::Vec2;
+use std::collections::HashMap;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum UVConvention {
@@ -43,7 +43,6 @@ impl From<RawScene> for Scene {
   }
 }
 
-
 #[derive(Debug)]
 pub struct Scene {
   uv: UVConvention,
@@ -61,10 +60,8 @@ impl RawScene {
   pub fn example() -> Self {
     RawScene {
       uv: UVConvention::ZeroToOne,
-      film: FilmBuilder{
-        size: (512, 512),
-      },
-      lgram: LGrammar{
+      film: FilmBuilder { size: (512, 512) },
+      lgram: LGrammar {
         axiom: vec![0, 1],
         rules: {
           let mut rules = HashMap::new();
@@ -83,7 +80,7 @@ impl RawScene {
           rules.insert(1, TurtleInstruction::Rotate(3.0));
           rules
         },
-      }
+      },
     }
   }
 }

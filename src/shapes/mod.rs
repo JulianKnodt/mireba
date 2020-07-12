@@ -4,6 +4,7 @@ pub mod obj;
 pub mod plane;
 pub mod sphere;
 pub mod triangle;
+pub mod triangle_list;
 
 use crate::{
   bounds::{Bounded, Bounds3},

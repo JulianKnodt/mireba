@@ -1,8 +1,29 @@
 use quick_maths::{Float, Ray, Vec3, Vector, Zero};
 use std::fmt::Debug;
 
+/// Returns whether two intervals overlap
 fn overlaps_1d<D: Float>(a_min: D, a_max: D, b_min: D, b_max: D) -> bool {
   a_max > b_min && b_max > a_min
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct OctantOrder(u8);
+impl OctantOrder {
+  pub const fn x_parity(self) -> bool { self.0 & 0b100 == 1 }
+  pub const fn y_parity(self) -> bool { self.0 & 0b10 == 1 }
+  pub const fn z_parity(self) -> bool { self.0 & 1 == 1 }
+  pub const fn inner(self) -> u8 { self.0 }
+  pub const fn is_valid(self) -> bool { self.0 < 8 }
+  pub fn in_dir(self, dir: &Vec3<bool>) -> impl Iterator<Item = OctantOrder> + '_ {
+    let dir = dir.apply_fn(|v| v as u8);
+    let check_1d = |curr, dir, out| curr == out || dir == out;
+    (0..8).filter_map(move |o| {
+      let is_valid = check_1d(self.0 >> 2, dir.x(), o >> 2)
+        && check_1d((self.0 >> 1) & 1, dir.y(), (o >> 1) & 1)
+        && check_1d(self.0 & 1, dir.z(), o & 1);
+      Some(OctantOrder(o)).filter(|_| is_valid)
+    })
+  }
 }
 
 /// Axis Aligned bounding box
@@ -140,13 +161,15 @@ impl Bounds3 {
     ]
   }
   /// Returns the octant which this point is in, assuming that the point is in the bounds
-  pub fn octant_of(&self, v: &Vec3) -> u8 {
+  pub fn octant_of(&self, v: &Vec3) -> OctantOrder {
     let &Vector([x, y, z]) = v;
     let Vector([lx, ly, lz]) = self.min;
     let Vector([ux, uy, uz]) = self.max;
-    (((x < (lx + ux) / 2.) as u8) << 2)
-      | (((y < (ly + uy) / 2.) as u8) << 1)
-      | (((z < (lz + uz) / 2.) as u8) << 0)
+    OctantOrder(
+      (((x < (lx + ux) / 2.) as u8) << 2)
+        | (((y < (ly + uy) / 2.) as u8) << 1)
+        | ((z < (lz + uz) / 2.) as u8),
+    )
   }
   pub const fn octant_order(&self) -> [u8; 8] {
     [

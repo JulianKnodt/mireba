@@ -1,6 +1,6 @@
 pub mod naive;
 // TODO enable this when actually needed
-// pub mod octree;
+pub mod octree;
 
 use crate::{interaction::SurfaceInteraction, shapes::Shapes};
 use quick_maths::Ray;

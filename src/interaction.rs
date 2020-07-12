@@ -36,4 +36,14 @@ pub struct SurfaceInteraction {
   pub wi: Vec3,
 }
 
-// impl SurfaceInteraction
+#[derive(Debug)]
+pub struct MediumInteraction {
+  /// Location and position of this interaction
+  pub it: Interaction,
+
+  /// Incoming direction
+  pub wi: Vec3,
+
+  /// The length this ray travelled thru the medium
+  pub optical_path_length: f32,
+}

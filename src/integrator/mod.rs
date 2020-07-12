@@ -1,8 +1,9 @@
+pub mod depth;
+pub mod direct;
+
 use crate::{accelerator::Accelerator, scene::Scene, spectrum::Spectrum, utils::morton_decode};
 use quick_maths::{Ray, Vec2, Vector, Zero};
 use std::fmt::Debug;
-
-pub mod direct;
 
 pub trait Integrator: Debug {
   fn render<El, Acc: Accelerator>(&self, s: &Scene<El, Acc>);

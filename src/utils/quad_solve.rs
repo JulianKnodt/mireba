@@ -16,20 +16,6 @@ where
 }
 /*
 
-/// Triangulates a face by taking the first vertex as the pivot and making triangles between
-/// adjacent pairs of vertices
-#[inline]
-pub fn triangulate<T: Copy, I: IntoIterator<Item = T>>(v: I) -> impl Iterator<Item = Vec3<T>> {
-  let mut iter = v.into_iter();
-  let first = iter.next().unwrap();
-  let second = iter.next().unwrap();
-  iter.scan(second, move |prev, n| {
-    let face = Vec3(first, *prev, n);
-    *prev = n;
-    Some(face)
-  })
-}
-
 /// Takes some vectors which additively sum to an arbitrary point and returns the rotation and
 /// scaling operator that would map all the input vectors to sum to the given destination.
 pub fn unitize<T: Float>(vecs: &[Vec3<T>], dest: &Vec3<T>) -> Quat<T> {

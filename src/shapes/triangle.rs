@@ -21,10 +21,6 @@ impl Bounded for Triangle {
 impl Shape for Triangle {
   fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
     let &Self(Vector([v0, v1, v2])) = self;
-    /*
-    println!("{:?}", (v0, v1, v2));
-    todo!();
-    */
     let eps = 0.00001;
     let e1 = v1 - v0;
     let e2 = v2 - v0;

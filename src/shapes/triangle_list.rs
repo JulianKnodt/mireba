@@ -1,6 +1,10 @@
-use super::triangle::Triangle;
-use crate::utils::triangulate;
-use quick_maths::{Vec3, Vector};
+use super::{triangle::Triangle, Shape};
+use crate::{
+  bounds::{Bounded, Bounds3},
+  interaction::SurfaceInteraction,
+  utils::triangulate,
+};
+use quick_maths::{Ray, Vec3, Vector};
 use std::{fs::File, io, io::BufRead, path::Path, str::FromStr};
 
 /// A group of faces
@@ -41,6 +45,24 @@ impl IndexedTriangles {
         .iter()
         .map(move |idxs| Triangle(idxs.apply_fn(|i| self.verts[i as usize])))
     })
+  }
+}
+
+impl Shape for IndexedTriangles {
+  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
+    self
+      .iter()
+      .filter_map(|t| t.intersect_ray(r))
+      .min_by(|a, b| a.it.closer(&b.it))
+  }
+}
+impl Bounded for IndexedTriangles {
+  fn bounds(&self) -> Bounds3 {
+    let mut verts = self.verts.iter();
+    let first = verts
+      .next()
+      .expect("Empty IndexedTriangles does not have well defined bounds");
+    verts.fold(Bounds3::empty(*first), |acc, n| acc.union_vec(n))
   }
 }
 
@@ -87,29 +109,28 @@ pub fn from_ascii_stl(p: impl AsRef<Path>) -> io::Result<IndexedTriangles> {
     let line = line?;
     let parts = line.split_whitespace().collect::<Vec<_>>();
     match parts.as_slice() {
-      // TODO handle name separately?
+      [] | [""] => (),
       ["solid", name] => curr_group.name = name.to_string(),
       ["outer", "loop"] => (),
       ["endloop"] => {
-        assert_eq!(count, 3, "Did not get correct count for vertices");
+        assert_eq!(count, 3, "Expect only 3 vertices in STL file");
         let indeces = Vec3::new(starting_index, starting_index + 1, starting_index + 2);
         curr_group.verts.push(indeces);
         starting_index = triangle_list.verts.len() as u32;
         count = 0;
       },
       ["endfacet"] => assert_eq!(count, 0),
-      [""] => (),
       ["endsolid", name] => assert_eq!(name, &curr_group.name),
-      ["facet", "normal", n_i, n_j, n_k] => {
-        let norm = Vec3::from_str_radix([n_i, n_j, n_k], 10).unwrap();
-        triangle_list.norms.push(norm);
-      },
+      ["facet", "normal", n_i, n_j, n_k] => triangle_list
+        .norms
+        .push(Vec3::from_str_radix([n_i, n_j, n_k], 10).unwrap()),
       ["vertex", v_i, v_j, v_k] => {
-        let v_pos = Vec3::from_str_radix([v_i, v_j, v_k], 10).unwrap();
         count += 1;
-        triangle_list.verts.push(v_pos);
+        triangle_list
+          .verts
+          .push(Vec3::from_str_radix([v_i, v_j, v_k], 10).unwrap());
       },
-      _ => eprintln!("Unknown line while parsing ASCII STL: {:?}", line),
+      _ => panic!("Unknown line while parsing ASCII STL: {:?}", line),
     };
   }
   triangle_list.groups.push(curr_group);
@@ -133,38 +154,39 @@ pub fn from_ascii_obj(p: impl AsRef<Path>, load_mtls: bool) -> io::Result<Indexe
         } else {
           let done_group = std::mem::replace(&mut curr_group, FaceGroup::new());
           triangle_list.groups.push(done_group);
+          curr_group.name = name.to_string();
         },
-      ["usemtl", mat_name] => if load_mtls {
-        todo!()
-      },
-      ["mtllib", mtl_files @ ..] => if load_mtls {
-         todo!()
-      },
-      ["v", x, y, z] => {
-        let pos = Vec3::from_str_radix([x, y, z], 10).unwrap();
-        triangle_list.verts.push(pos);
-      },
-      ["v", x, y, z, _w] => {
-        let pos = Vec3::from_str_radix([x, y, z], 10).unwrap();
-        triangle_list.verts.push(pos);
-      },
+      ["usemtl", _mat_name] =>
+        if load_mtls {
+          todo!()
+        },
+      ["mtllib", _mtl_files @ ..] =>
+        if load_mtls {
+          todo!()
+        },
+      ["v", x, y, z] => triangle_list
+        .verts
+        .push(Vec3::from_str_radix([x, y, z], 10).unwrap()),
+      ["v", x, y, z, _w] => triangle_list
+        .verts
+        .push(Vec3::from_str_radix([x, y, z], 10).unwrap()),
       // Vertex normal
-      ["vn", i, j, k] => {
-        let norm = Vec3::from_str_radix([i, j, k], 10).unwrap();
-        triangle_list.norms.push(norm);
-      },
+      ["vn", i, j, k] => triangle_list
+        .norms
+        .push(Vec3::from_str_radix([i, j, k], 10).unwrap()),
       // Vertex Textures
-      ["vt", u, v, w] => {
-        let texture = Vec3::from_str_radix([u, v, w], 10).unwrap();
-        triangle_list.norms.push(texture);
-      },
+      ["vt", u, v, w] => triangle_list
+        .textures
+        .push(Vec3::from_str_radix([u, v, w], 10).unwrap()),
       // Points
       ["p", _vs @ ..] => todo!(),
       // Faces
       ["f", fs @ ..] => {
-        if fs.len() < 3 {
-          panic!("OBJ faces require at least 3 elements")
-        }
+        assert!(
+          fs.len() >= 3,
+          "OBJ faces require at least 3 elements: {:?}",
+          line
+        );
         let vert_indeces = fs.iter().map(|f| parse_slashed::<u32>(f).unwrap());
         for v in triangulate(vert_indeces) {
           let Vector([vs0, vs1, vs2]) = v;
@@ -177,14 +199,20 @@ pub fn from_ascii_obj(p: impl AsRef<Path>, load_mtls: bool) -> io::Result<Indexe
             (Some(vt0), Some(vt1), Some(vt2)) => {
               curr_group.verts.push(Vec3::new(vt0, vt1, vt2) - 1);
             },
-            _ => panic!("Partially specified some texture indeces but not all in OBJ file"),
+            _ => panic!(
+              "Partially specified some texture indeces but not all in OBJ file {}",
+              line
+            ),
           };
           match (vn0, vn1, vn2) {
             (None, None, None) => (),
             (Some(vn0), Some(vn1), Some(vn2)) => {
               curr_group.verts.push(Vec3::new(vn0, vn1, vn2) - 1);
             },
-            _ => panic!("Partially specified some texture indeces but not all in OBJ file"),
+            _ => panic!(
+              "Partially specified some texture indeces but not all in OBJ file {}",
+              line
+            ),
           };
         }
       },

@@ -1,5 +1,6 @@
 use num::Zero;
 use quick_maths::{Vec2, Vec3};
+use std::cmp::Ordering;
 
 #[derive(Debug)]
 pub struct Interaction {
@@ -21,6 +22,7 @@ impl Default for Interaction {
 impl Interaction {
   pub fn new() -> Self { Interaction::default() }
   pub fn at(t: f32, p: Vec3) -> Self { Self { t, p } }
+  pub fn closer(&self, o: &Self) -> Ordering { self.t.partial_cmp(&o.t).unwrap() }
 }
 
 #[derive(Debug)]

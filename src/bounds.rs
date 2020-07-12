@@ -1,4 +1,4 @@
-use quick_maths::{Float, Ray, Vec3, Vector, Zero};
+use quick_maths::{Float, Ray, Vec3, Vector};
 use std::fmt::Debug;
 
 /// Returns whether two intervals overlap
@@ -65,8 +65,13 @@ impl<const N: usize> Bounds<N> {
     let (_, max) = self.max.sift(&o.max);
     Self::new(min, max)
   }
+  pub fn union_vec(&self, v: &Vector<f32, N>) -> Self {
+    let (min, _) = self.min.sift(&v);
+    let (_, max) = self.max.sift(&v);
+    Self::new(min, max)
+  }
   pub fn center(&self) -> Vector<f32, N> { Vector::with(|i| (self.min[i] + self.max[i]) / 2.0) }
-  pub fn empty() -> Self { Bounds::new(Vector::zero(), Vector::zero()) }
+  pub fn empty(v: Vector<f32, N>) -> Self { Bounds::new(v, v) }
 }
 
 impl Bounds3 {
@@ -187,6 +192,8 @@ impl Bounds3 {
 }
 
 pub trait Bounded: Debug {
+  // This is not a cheap call, as it expects a computation of bounds, and doesn't just
+  // read from a variable. If a cheap bounds is needed, store the result from this call.
   fn bounds(&self) -> Bounds3;
 }
 

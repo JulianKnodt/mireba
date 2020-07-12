@@ -1,6 +1,5 @@
 pub mod builder;
 pub use builder::Builder;
-pub mod obj;
 pub mod plane;
 pub mod sphere;
 pub mod triangle;

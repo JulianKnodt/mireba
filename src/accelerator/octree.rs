@@ -160,7 +160,9 @@ impl Octree {
     }
     let dir = ray.dir.is_sign_positive();
     let curr_position = node.bounds.octant_of(&ray.pos);
-    curr_position.in_dir(&dir).map(|oo| node.first_child_idx + oo.inner() as u32)
+    curr_position
+      .in_dir(&dir)
+      .map(|oo| node.first_child_idx + oo.inner() as u32)
       .map(|node_idx| self.naive_intersect(node_idx, ray))
       .chain(std::iter::once(own_intersection))
       .filter_map(|v| v)

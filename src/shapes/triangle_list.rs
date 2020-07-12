@@ -1,5 +1,6 @@
 use super::triangle::Triangle;
-use quick_maths::{Vec3};
+use crate::utils::triangulate;
+use quick_maths::{Vec3, Vector};
 use std::{fs::File, io, io::BufRead, path::Path, str::FromStr};
 
 /// A group of faces
@@ -15,21 +16,6 @@ pub struct FaceGroup {
 impl FaceGroup {
   pub fn new() -> Self { Default::default() }
   pub fn is_empty(&self) -> bool { self.verts.is_empty() }
-  /*
-  fn add<I>(&mut self, iter: I)
-  where
-    I: Iterator<Item = (Vec3<u32>, Option<Vec3<u32>>, Option<Vec3<u32>>)>, {
-    for (v, vt, vn) in iter {
-      self.verts.push(v);
-      if let Some(vt) = vt {
-        self.textures.push(vt);
-      }
-      if let Some(vn) = vn {
-        self.normals.push(vn);
-      }
-    }
-  }
-  */
 }
 
 #[derive(Debug, Default)]
@@ -58,9 +44,7 @@ impl IndexedTriangles {
   }
 }
 
-pub fn parse_slashed<D: FromStr>(
-  s: &str,
-) -> Result<(D, Option<D>, Option<D>), <D as FromStr>::Err>
+fn parse_slashed<D: FromStr>(s: &str) -> Result<(D, Option<D>, Option<D>), <D as FromStr>::Err>
 where
   <D as FromStr>::Err: std::fmt::Debug, {
   let mut items = s.split('/');
@@ -129,6 +113,88 @@ pub fn from_ascii_stl(p: impl AsRef<Path>) -> io::Result<IndexedTriangles> {
     };
   }
   triangle_list.groups.push(curr_group);
+  Ok(triangle_list)
+}
+
+pub fn from_ascii_obj(p: impl AsRef<Path>, load_mtls: bool) -> io::Result<IndexedTriangles> {
+  let f = File::open(p.as_ref())?;
+  let buf = io::BufReader::new(f);
+  let mut triangle_list = IndexedTriangles::default();
+  let mut curr_group = FaceGroup::new();
+  for line in buf.lines() {
+    let line = line?;
+    // TODO convert this into not using collect as it allocates
+    let parts = line.split_whitespace().collect::<Vec<_>>();
+    match parts.as_slice() {
+      [] | ["#", ..] => (),
+      ["g", name] =>
+        if curr_group.is_empty() && curr_group.name.is_empty() {
+          curr_group.name = name.to_string();
+        } else {
+          let done_group = std::mem::replace(&mut curr_group, FaceGroup::new());
+          triangle_list.groups.push(done_group);
+        },
+      ["usemtl", mat_name] => if load_mtls {
+        todo!()
+      },
+      ["mtllib", mtl_files @ ..] => if load_mtls {
+         todo!()
+      },
+      ["v", x, y, z] => {
+        let pos = Vec3::from_str_radix([x, y, z], 10).unwrap();
+        triangle_list.verts.push(pos);
+      },
+      ["v", x, y, z, _w] => {
+        let pos = Vec3::from_str_radix([x, y, z], 10).unwrap();
+        triangle_list.verts.push(pos);
+      },
+      // Vertex normal
+      ["vn", i, j, k] => {
+        let norm = Vec3::from_str_radix([i, j, k], 10).unwrap();
+        triangle_list.norms.push(norm);
+      },
+      // Vertex Textures
+      ["vt", u, v, w] => {
+        let texture = Vec3::from_str_radix([u, v, w], 10).unwrap();
+        triangle_list.norms.push(texture);
+      },
+      // Points
+      ["p", _vs @ ..] => todo!(),
+      // Faces
+      ["f", fs @ ..] => {
+        if fs.len() < 3 {
+          panic!("OBJ faces require at least 3 elements")
+        }
+        let vert_indeces = fs.iter().map(|f| parse_slashed::<u32>(f).unwrap());
+        for v in triangulate(vert_indeces) {
+          let Vector([vs0, vs1, vs2]) = v;
+          let (v0, vt0, vn0) = vs0;
+          let (v1, vt1, vn1) = vs1;
+          let (v2, vt2, vn2) = vs2;
+          curr_group.verts.push(Vec3::new(v0, v1, v2) - 1);
+          match (vt0, vt1, vt2) {
+            (None, None, None) => (),
+            (Some(vt0), Some(vt1), Some(vt2)) => {
+              curr_group.verts.push(Vec3::new(vt0, vt1, vt2) - 1);
+            },
+            _ => panic!("Partially specified some texture indeces but not all in OBJ file"),
+          };
+          match (vn0, vn1, vn2) {
+            (None, None, None) => (),
+            (Some(vn0), Some(vn1), Some(vn2)) => {
+              curr_group.verts.push(Vec3::new(vn0, vn1, vn2) - 1);
+            },
+            _ => panic!("Partially specified some texture indeces but not all in OBJ file"),
+          };
+        }
+      },
+      ["s", "off"] => (),
+      l => panic!("Unexpected {:?}", l),
+    };
+  }
+  if !curr_group.is_empty() {
+    triangle_list.groups.push(curr_group);
+  }
   Ok(triangle_list)
 }
 

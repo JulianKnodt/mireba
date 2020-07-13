@@ -2,6 +2,7 @@ pub mod uniform;
 // TODO this doesn't work well yet but...
 // pub mod metropolis;
 pub mod builder;
+pub mod functional;
 
 use quick_maths::{DefaultFloat, Vector};
 use std::fmt::Debug;

@@ -15,6 +15,10 @@ pub trait BSDF: Debug {
   /// Evaluate this bsdf at the surface interaction in the outgoing direction
   fn eval(&self, si: &SurfaceInteraction, wo: Vec3) -> Spectrum;
   // TODO add pdf in some outgoing direction
+  fn sample(&self) -> (Sample, Spectrum) {
+    // TODO
+    todo!()
+  }
 }
 
 /// Different implementations of BSDFs
@@ -35,7 +39,6 @@ impl BSDFImpl {
       MTL(mtl) => mtl.eval(si, wo),
     }
   }
-  pub fn sample(&self) -> (Sample, Spectrum);
 
   /// Returns the ambient amont of lighting of this surface.
   pub fn ambient(&self) -> Spectrum { Spectrum::zero() }

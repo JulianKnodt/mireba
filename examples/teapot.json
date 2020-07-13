@@ -1,0 +1,76 @@
+{
+  "lights": [
+    {
+      "Point": {
+        "pos": [
+          0.0,
+          10.0,
+          -10.0
+        ],
+        "intensity": 50.0,
+        "spectrum": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    }
+  ],
+  "camera": {
+    "film_builder": {
+      "size": [
+        512,
+        512
+      ]
+    },
+    "to_world": {
+      "LookAt": {
+        "origin": [
+          0.0,
+          2.0,
+          -5.0
+        ],
+        "towards": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "up": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    "variant": {
+      "Perspective": {
+        "x_fov": 30.0,
+        "near_clip": 0.001,
+        "far_clip": 1000.0,
+        "aspect": 1.0
+      }
+    }
+  },
+  "shapes": {
+    "teapot": {
+      "to_world": "Identity",
+      "variant": {
+        "Obj": {
+          "file": "../data/teapot.obj"
+        }
+      }
+    }
+  },
+  "bsdfs": {
+    "debug": {
+      "Diffuse": [
+        0.7,
+        0.8,
+        0.5
+      ]
+    }
+  },
+  "bsdf_mapping": {
+    "teapot": "debug"
+  }
+}

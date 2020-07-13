@@ -6,7 +6,7 @@ pub mod mtl;
 pub mod phong;
 
 use crate::{interaction::SurfaceInteraction, spectrum::Spectrum};
-use quick_maths::{One, Vec3};
+use quick_maths::{Zero, Vec3};
 use std::fmt::Debug;
 
 /// Trait representing a BSDF
@@ -35,16 +35,17 @@ impl BSDFImpl {
       MTL(mtl) => mtl.eval(si, wo),
     }
   }
-  pub fn ambient(&self) -> Spectrum { Spectrum::one() }
+  pub fn sample(&self) -> (Sample, Spectrum);
+
+  /// Returns the ambient amont of lighting of this surface.
+  pub fn ambient(&self) -> Spectrum { Spectrum::zero() }
 }
 
-/*
 #[derive(Debug)]
 pub struct Sample {
-  out: Vec3,
+  wo: Vec3,
   // Probability of sampling
   pdf: f32,
   // relative index of refraction
-  // eta: f32,
+  eta: f32,
 }
-*/

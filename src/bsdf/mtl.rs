@@ -1,44 +1,43 @@
 /// Handling parsing mtl files
-use crate::material::Material;
-use linalg::num::Float;
-use linalg::vec::{Ray, Vec3, Vector};
+use super::BSDF;
 use crate::{
-  brdf::Illum,
-  vis::Visibility,
+  interaction::SurfaceInteraction,
+  spectrum::{from_rgb, Spectrum},
 };
-use num::Zero;
+use num::Num;
+use quick_maths::{One, Vec3, Zero};
 use std::{
   io::{self, BufRead, Read},
   mem::replace,
 };
 
-/// Directly loaded material loaded from an mtl file
+/// Directly loaded mtl file
 #[derive(Debug, Clone, PartialEq)]
-pub struct MTL<T> {
+pub struct MTL {
   pub name: String,
-  n_s: T,
-  n_i: T,
-  d: T,
-  t_r: T,
-  t_f: Vec3<T>,
+  n_s: f32,
+  n_i: f32,
+  d: f32,
+  t_r: f32,
+  t_f: Vec3,
   // Illuminance kind
-  pub illum: Illum,
-  k_ambient: Vec3<T>,
-  k_diffuse: Vec3<T>,
-  k_specular: Vec3<T>,
-  k_emission: Vec3<T>,
+  pub illum: u8,
+  k_ambient: Spectrum,
+  k_diffuse: Spectrum,
+  k_specular: Spectrum,
+  k_emission: Spectrum,
 }
 
-impl<T: Float> MTL<T> {
-  pub(crate) fn empty() -> Self {
+impl MTL {
+  pub fn empty() -> Self {
     Self {
       name: Default::default(),
-      n_s: T::zero(),
-      n_i: T::zero(),
-      d: T::zero(),
-      t_r: T::zero(),
+      n_s: 0.0,
+      n_i: 0.0,
+      d: 0.0,
+      t_r: 0.0,
       t_f: Vec3::zero(),
-      illum: Illum::Checkers,
+      illum: 0,
       k_ambient: Vec3::zero(),
       k_diffuse: Vec3::zero(),
       k_specular: Vec3::zero(),
@@ -46,43 +45,47 @@ impl<T: Float> MTL<T> {
     }
   }
   // Builder for MTL
-  pub fn ambient(self, k_ambient: Vec3<T>) -> Self { Self { k_ambient, ..self } }
-  pub fn diffuse(self, k_diffuse: Vec3<T>) -> Self { Self { k_diffuse, ..self } }
-  pub fn specular(self, k_specular: Vec3<T>) -> Self { Self { k_specular, ..self } }
-  pub fn illum(self, illum: u8) -> Self {
-    let illum = Illum::new(illum);
-    Self { illum, ..self }
-  }
-  pub fn brdf(self, illum: Illum) -> Self { Self { illum, ..self } }
-  //
+  pub fn ambient(self, k_ambient: Vec3) -> Self { Self { k_ambient, ..self } }
+  pub fn diffuse(self, k_diffuse: Vec3) -> Self { Self { k_diffuse, ..self } }
+  pub fn specular(self, k_specular: Vec3) -> Self { Self { k_specular, ..self } }
 }
 
-impl<T: Float> Material<T> for MTL<T> {
-  fn diffuse_refl(&self) -> Vec3<T> { self.k_diffuse }
-  fn specular_refl(&self) -> Vec3<T> { self.k_specular }
-  fn ambient_refl(&self) -> Vec3<T> { self.k_ambient }
-  fn shine(&self) -> T { self.n_s }
-  fn transparent_refl(&self) -> Vec3<T> { self.t_f }
-  fn reflected(&self, eye: &Ray<T>, vis: &Visibility<T>) -> Option<Ray<T>> {
-    // TODO check illum here to determine method of reflection
-    let incident = (eye.pos - vis.pos).norm();
-    Some(Ray::new(vis.pos, incident.reflect(&vis.norm)))
-  }
-  fn refracted(&self, eye: &Ray<T>, vis: &Visibility<T>) -> Option<Ray<T>> {
-    // index of refraction is n_i
-    let incident = (eye.pos - vis.pos).norm();
-    let flip_eta = incident.dot(&vis.norm).is_sign_negative();
-    let eta = if flip_eta { -self.n_i } else { self.n_i };
-    incident
-      .refract(vis.norm, eta)
-      .map(|dir| Ray::new(vis.pos, dir))
+macro_rules! quint {
+  ($v: expr) => {{
+    let a = $v * $v;
+    a * a * $v
+  }};
+}
+
+fn schlick(cos_theta: f32, n_s: f32) -> Spectrum {
+  (Spectrum::one() - n_s) * quint!(1.0 - cos_theta) + n_s
+}
+
+impl BSDF for MTL {
+  fn eval(&self, si: &SurfaceInteraction, wo: Vec3) -> Spectrum {
+    // http://paulbourke.net/dataformats/mtl/
+    // These are best guess approximations because these are not light vectors but outgoing
+    // direction vectors.
+    match self.illum {
+      0 => self.k_diffuse,
+      1 => self.k_diffuse * si.normal.dot(&wo),
+      // This always includes a term for recursive ray tracing.
+      2 | 3 | 4 =>
+        self.k_diffuse * si.normal.dot(&wo) + self.k_ambient * (wo.dot(&si.wi.reflect(&si.normal))),
+      5 => {
+        let bisector = si.wi.reflect(&si.normal);
+        self.k_diffuse * si.normal.dot(&wo)
+          + self.k_ambient * wo.dot(&bisector) * schlick(wo.dot(&bisector), self.n_s)
+          + schlick(si.normal.dot(&si.wi), self.n_s)
+      },
+      _ => todo!(),
+    }
   }
 }
 
 /// Reads an mtl file from src, and panicks if the read failes
-pub fn read_mtl<R: Read, T: Float>(src: R) -> io::Result<Vec<MTL<T>>> {
+pub fn read_mtl(src: impl Read, out: &mut Vec<MTL>) -> io::Result<()> {
   let buf = io::BufReader::new(src);
-  let mut out = vec![];
   let mut curr = MTL::empty();
   for line in buf.lines() {
     let line = line?;
@@ -98,35 +101,28 @@ pub fn read_mtl<R: Read, T: Float>(src: R) -> io::Result<Vec<MTL<T>>> {
         if curr.name.is_empty() {
           curr.name = (*name).to_string();
         } else {
-          let finished = replace(&mut curr, MTL::empty());
-          out.push(finished);
+          out.push(replace(&mut curr, MTL::empty()));
           curr.name = (*name).to_string();
         },
       // TODO convert below into errors
-      ["Ns", ns] => curr.n_s = T::from_str_radix(ns, 10).unwrap_or_else(|_| T::zero()),
-      ["Ni", ni] => curr.n_i = T::from_str_radix(ni, 10).unwrap_or_else(|_| T::zero()),
-      ["d", d] => curr.d = T::from_str_radix(d, 10).unwrap_or_else(|_| T::zero()),
-      ["Tr", tr] => curr.t_r = T::from_str_radix(tr, 10).unwrap_or_else(|_| T::zero()),
-      ["Tf", x, y, z] =>
-        curr.t_f = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| Vec3::zero()),
-      ["illum", il] => curr.illum = Illum::new(il.parse().unwrap()),
-      ["Ka", x, y, z] =>
-        curr.k_ambient = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| Vec3::zero()),
-      ["Kd", x, y, z] =>
-        curr.k_diffuse = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| Vec3::zero()),
-      ["Ks", x, y, z] =>
-        curr.k_specular = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| Vec3::zero()),
-      ["Ke", x, y, z] =>
-        curr.k_emission = Vec3::<T>::from_str_radix((x, y, z), 10).unwrap_or_else(|_| Vec3::zero()),
+      ["Ns", ns] => curr.n_s = f32::from_str_radix(ns, 10).unwrap(),
+      ["Ni", ni] => curr.n_i = f32::from_str_radix(ni, 10).unwrap(),
+      ["d", d] => curr.d = f32::from_str_radix(d, 10).unwrap(),
+      ["Tr", tr] => curr.t_r = f32::from_str_radix(tr, 10).unwrap(),
+      ["Tf", x, y, z] => curr.t_f = Vec3::from_str_radix([x, y, z], 10).unwrap(),
+      ["illum", il] => curr.illum = il.parse().unwrap(),
+      ["Ka", x, y, z] => curr.k_ambient = from_rgb(Vec3::from_str_radix([x, y, z], 10).unwrap()),
+      ["Kd", x, y, z] => curr.k_diffuse = from_rgb(Vec3::from_str_radix([x, y, z], 10).unwrap()),
+      ["Ks", x, y, z] => curr.k_specular = from_rgb(Vec3::from_str_radix([x, y, z], 10).unwrap()),
+      ["Ke", x, y, z] => curr.k_emission = from_rgb(Vec3::from_str_radix([x, y, z], 10).unwrap()),
       // TODO implement the below
-      ["map_Ka", _src] => (),
-      ["map_Kd", _src] => (),
-      ["map_bump", _src] => (),
-      ["bump", _src] => (),
+      ["map_Ka", _src] => todo!(),
+      ["map_Kd", _src] => todo!(),
+      ["map_bump", _src] | ["bump", _src] => todo!(),
       unknown => panic!("Unknown mtl file command {:?}", unknown),
     }
   }
-  Ok(out)
+  Ok(())
 }
 
 #[test]

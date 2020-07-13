@@ -25,6 +25,7 @@ pub enum Variant {
   Sphere(sphere::Sphere),
   Plane(plane::Plane),
   Triangle(triangle::Triangle),
+  TriangleList(triangle_list::IndexedTriangles),
   /*
   Plane,
   BBox,
@@ -65,6 +66,7 @@ impl Shapes {
       Sphere(s) => s.intersect_ray(r),
       Plane(p) => p.intersect_ray(r),
       Triangle(t) => t.intersect_ray(r),
+      TriangleList(t) => t.intersect_ray(r),
     }
   }
   pub fn bounds(&self) -> Bounds3 {
@@ -73,6 +75,7 @@ impl Shapes {
       Sphere(s) => s.bounds(),
       Plane(p) => p.bounds(),
       Triangle(t) => t.bounds(),
+      TriangleList(t) => t.bounds(),
     }
   }
 }

@@ -2,10 +2,11 @@ pub mod builder;
 pub use builder::Builder;
 pub mod debug;
 pub mod diffuse;
+pub mod mtl;
 pub mod phong;
 
 use crate::{interaction::SurfaceInteraction, spectrum::Spectrum};
-use quick_maths::Vec3;
+use quick_maths::{One, Vec3};
 use std::fmt::Debug;
 
 /// Trait representing a BSDF
@@ -21,16 +22,20 @@ pub trait BSDF: Debug {
 pub enum BSDFImpl {
   Diffuse(diffuse::Diffuse),
   Debug(debug::Debug),
+  MTL(mtl::MTL),
 }
 
 impl BSDFImpl {
+  // TODO decide if wo should be a reference or not
   pub fn eval(&self, si: &SurfaceInteraction, wo: Vec3) -> Spectrum {
     use BSDFImpl::*;
     match self {
       Diffuse(d) => d.eval(si, wo),
       Debug(d) => d.eval(si, wo),
+      MTL(mtl) => mtl.eval(si, wo),
     }
   }
+  pub fn ambient(&self) -> Spectrum { Spectrum::one() }
 }
 
 /*

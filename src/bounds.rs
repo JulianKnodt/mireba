@@ -16,7 +16,9 @@ impl OctantOrder {
   pub const fn is_valid(self) -> bool { self.0 < 8 }
   pub fn in_dir(self, dir: &Vec3<bool>) -> impl Iterator<Item = OctantOrder> + '_ {
     let dir = dir.apply_fn(|v| v as u8);
-    let check_1d = |curr, dir, out| curr == out || dir == out;
+    // let check_1d = |curr, dir, out| curr == out || dir == out;
+    // the following should also be equivalent
+    let check_1d = |c: u8, d: u8, o: u8| (!(c ^ o) | !(d ^ o)) != 0;
     (0..8).filter_map(move |o| {
       let is_valid = check_1d(self.0 >> 2, dir.x(), o >> 2)
         && check_1d((self.0 >> 1) & 1, dir.y(), (o >> 1) & 1)
@@ -208,7 +210,7 @@ mod bounds_test {
       if t.is_sign_negative() { return TestResult::discard() }
       let inside = bounds.contains_vec(&r.at(t));
       if !inside { return TestResult::discard() }
-      TestResult::from_bool(bounds.intersects_ray(&r))
+      TestResult::from_bool(bounds.intersect_ray(&r))
     }
   }
 }

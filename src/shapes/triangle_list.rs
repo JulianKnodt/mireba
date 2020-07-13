@@ -24,6 +24,7 @@ impl FaceGroup {
 
 #[derive(Debug, Default)]
 pub struct IndexedTriangles {
+  src: String,
   /// list of vertices
   verts: Vec<Vec3>,
   /// list of normals
@@ -32,6 +33,10 @@ pub struct IndexedTriangles {
   textures: Vec<Vec3>,
 
   groups: Vec<FaceGroup>,
+}
+
+impl PartialEq for IndexedTriangles {
+  fn eq(&self, o: &Self) -> bool { self.src == o.src }
 }
 
 impl IndexedTriangles {
@@ -74,28 +79,6 @@ where
   let vt = items.next().map(|vt| vt.parse()).transpose()?;
   let vn = items.next().map(|vn| vn.parse()).transpose()?;
   Ok((v, vt, vn))
-}
-
-#[test]
-fn test_from_ascii_obj() {
-  let p = Path::new(file!())
-    .parent()
-    .unwrap()
-    .join("sample_files")
-    .join("teapot.obj");
-  assert!(from_ascii_obj::<_, f32>(p).is_ok());
-}
-
-// Added test for more features of obj
-#[test]
-#[cfg(not(debug_assertions))]
-fn test_from_ascii_obj_complex() {
-  let p = Path::new(file!())
-    .parent()
-    .unwrap()
-    .join("sample_files")
-    .join("sponza.obj");
-  assert!(from_ascii_obj::<_, f32>(p).is_ok());
 }
 
 pub fn from_ascii_stl(p: impl AsRef<Path>) -> io::Result<IndexedTriangles> {
@@ -141,11 +124,17 @@ pub fn from_ascii_obj(p: impl AsRef<Path>, load_mtls: bool) -> io::Result<Indexe
   let f = File::open(p.as_ref())?;
   let buf = io::BufReader::new(f);
   let mut triangle_list = IndexedTriangles::default();
+  triangle_list.src = p.as_ref().to_string_lossy().into_owned();
   let mut curr_group = FaceGroup::new();
   for line in buf.lines() {
     let line = line?;
     // TODO convert this into not using collect as it allocates
-    let parts = line.split_whitespace().collect::<Vec<_>>();
+    let parts = line
+      .splitn(2, '#')
+      .next()
+      .unwrap()
+      .split_whitespace()
+      .collect::<Vec<_>>();
     match parts.as_slice() {
       [] | ["#", ..] => (),
       ["g", name] =>
@@ -231,7 +220,35 @@ fn test_from_ascii_stl() {
   let p = Path::new(file!())
     .parent()
     .unwrap()
+    .parent()
+    .unwrap()
+    .join("unit_tests")
     .join("sample_files")
     .join("magnolia.stl");
-  assert!(from_ascii_stl::<_, f32>(p).is_ok());
+  from_ascii_stl(p).expect("Failed to parse stl file");
+}
+
+#[test]
+fn test_from_ascii_obj() {
+  let p = Path::new(file!())
+    .parent()
+    .unwrap()
+    .parent()
+    .unwrap()
+    .join("unit_tests")
+    .join("sample_files")
+    .join("teapot.obj");
+  from_ascii_obj(p, false).expect("Failed to parse obj file");
+}
+
+// Added test for more features of obj
+#[test]
+#[cfg(not(debug_assertions))]
+fn test_from_ascii_obj_complex() {
+  let p = Path::new(file!())
+    .parent()
+    .unwrap()
+    .join("sample_files")
+    .join("sponza.obj");
+  assert!(from_ascii_obj(p, true).is_ok());
 }

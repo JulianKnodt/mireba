@@ -75,23 +75,26 @@ impl Bounded for Plane {
   }
 }
 
+/*
 #[cfg(test)]
 mod test_plane {
   use super::Plane;
-  use crate::{vec::Ray, vis::Visible};
+  use super::Shape;
+  use quick_maths::Ray;
   use quickcheck::TestResult;
   quickcheck! {
-    fn repr_point_on_plane(plane: Plane<f32>) -> bool {
+    fn repr_point_on_plane(plane: Plane) -> bool {
       plane.on_plane(&plane.repr_point())
     }
   }
   quickcheck! {
     // Tests that any ray not parallel to the plane hits it
-    fn hits_plane(r: Ray<f32>, plane: Plane<f32>) -> TestResult {
-      match plane.hit(&r) {
+    fn hits_plane(r: Ray, plane: Plane) -> TestResult {
+      match plane.intersect_ray(&r) {
         None => TestResult::discard(),
-        Some(vis) => TestResult::from_bool(plane.on_plane(&vis.pos)),
+        Some(si) => TestResult::from_bool(plane.on_plane(&si.it.p)),
       }
     }
   }
 }
+*/

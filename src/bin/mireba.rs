@@ -63,5 +63,4 @@ pub fn main() {
     .to_image()
     .save(output_file)
     .expect("Failed to save file");
-  // TODO extract film here
 }

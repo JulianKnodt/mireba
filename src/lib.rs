@@ -28,6 +28,7 @@ pub mod transform;
 pub mod two_d;
 
 #[cfg(test)]
+#[macro_use]
 extern crate quickcheck;
 /*
 /// Property checking for various components

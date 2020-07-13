@@ -1,4 +1,7 @@
-use crate::{bounds::Bounds3, shapes::sphere::Sphere};
+use crate::{
+  bounds::Bounds3,
+  shapes::{sphere::Sphere, triangle::Triangle},
+};
 use quick_maths::Vec3;
 use quickcheck::{Arbitrary, Gen};
 
@@ -17,11 +20,12 @@ impl Arbitrary for Sphere {
 }
 
 /*
-impl Arbitrary for Plane<f32> {
+impl Arbitrary for Plane {
   fn arbitrary<G: Gen>(g: &mut G) -> Self { Plane::new(Vec3::arbitrary(g), f32::arbitrary(g)) }
 }
+*/
 
-impl Arbitrary for Triangle<Vec3<f32>> {
+impl Arbitrary for Triangle {
   fn arbitrary<G: Gen>(g: &mut G) -> Self {
     let v0 = Vec3::arbitrary(g);
     let v1 = loop {
@@ -33,10 +37,9 @@ impl Arbitrary for Triangle<Vec3<f32>> {
     loop {
       let v2 = Vec3::arbitrary(g);
       let t = Triangle(Vec3::new(v0, v1, v2));
-      if t.as_ref().area() > std::f32::EPSILON * 3.0 {
+      if t.area() > std::f32::EPSILON * 3.0 {
         break t;
       }
     }
   }
 }
-*/

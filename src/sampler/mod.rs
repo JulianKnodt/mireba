@@ -19,3 +19,13 @@ pub trait Sampler: Debug {
 pub enum Samplers {
   Uniform(uniform::Uniform),
 }
+
+macro_rules! impl_from_sampler {
+  ($for: ty, $variant: path) => {
+    impl From<$for> for Samplers {
+      fn from(v: $for) -> Self { $variant(v) }
+    }
+  };
+}
+
+impl_from_sampler!(uniform::Uniform, Samplers::Uniform);

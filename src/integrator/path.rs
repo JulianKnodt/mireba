@@ -3,12 +3,12 @@ use crate::{accelerator::Accelerator, scene::Scene, spectrum::Spectrum};
 use quick_maths::{Ray, Vec2, Zero};
 
 #[derive(Debug)]
-pub struct Direct {
+pub struct Path {
   // TODO add other items here?
   depth: u32,
 }
 
-impl SamplingIntegrator for Direct {
+impl SamplingIntegrator for Path {
   fn sample<El, Acc: Accelerator>(
     &self,
     _position: Vec2,

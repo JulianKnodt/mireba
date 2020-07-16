@@ -5,8 +5,8 @@ pub mod diffuse;
 pub mod mtl;
 pub mod phong;
 
-use crate::{interaction::SurfaceInteraction, spectrum::Spectrum};
-use quick_maths::{Zero, Vec3};
+use crate::{interaction::SurfaceInteraction, sampler::Samplers, spectrum::Spectrum};
+use quick_maths::{Vec3, Zero};
 use std::fmt::Debug;
 
 /// Trait representing a BSDF
@@ -14,11 +14,10 @@ pub trait BSDF: Debug {
   // fn sample(&self, si: &SurfaceInteraction, wo: Vec3, dir_sample: Vec2) -> (Sample, Spectrum);
   /// Evaluate this bsdf at the surface interaction in the outgoing direction
   fn eval(&self, si: &SurfaceInteraction, wo: Vec3) -> Spectrum;
-  // TODO add pdf in some outgoing direction
-  fn sample(&self) -> (Sample, Spectrum) {
-    // TODO
-    todo!()
-  }
+  /// Select some direction and a probability of going in that direction.
+  /// Default implementation uniformly samples along hemisphere
+  /// add pdf in some outgoing direction.
+  fn sample(&self, _s: Samplers) -> (Sample, Spectrum) { todo!() }
 }
 
 /// Different implementations of BSDFs
@@ -40,7 +39,7 @@ impl BSDFImpl {
     }
   }
 
-  /// Returns the ambient amont of lighting of this surface.
+  /// Returns the ambient amount of lighting of this surface.
   pub fn ambient(&self) -> Spectrum { Spectrum::zero() }
 }
 

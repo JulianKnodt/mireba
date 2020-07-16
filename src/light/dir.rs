@@ -15,7 +15,7 @@ pub struct Dir {
   spectrum: Spectrum,
 }
 
-impl Point {
+impl Dir {
   pub fn new(offset_dir: Vec3, intensity: f32, spectrum: Spectrum) -> Self {
     Self {
       offset_dir,

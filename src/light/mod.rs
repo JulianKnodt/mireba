@@ -1,3 +1,6 @@
+pub mod dir;
+pub mod point;
+
 use crate::{interaction::Interaction, spectrum::Spectrum};
 use quick_maths::Ray;
 use std::fmt::Debug;
@@ -17,6 +20,7 @@ pub trait Light: Debug {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum Lights {
   Point(point::Point),
+  Dir(dir::Dir),
 }
 
 impl Lights {
@@ -24,8 +28,7 @@ impl Lights {
     use Lights::*;
     match self {
       Point(p) => p.sample_towards(it),
+      Dir(d) => d.sample_towards(it),
     }
   }
 }
-
-pub mod point;

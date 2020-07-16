@@ -1,6 +1,7 @@
 use super::SamplingIntegrator;
 use crate::{
   accelerator::Accelerator,
+  camera::Cameras,
   scene::Scene,
   spectrum::{self, Spectrum},
 };
@@ -16,6 +17,7 @@ impl SamplingIntegrator for Depth {
     &self,
     _position: Vec2,
     ray: &Ray,
+    _camera: &Cameras,
     scene: &Scene<El, Acc>,
   ) -> Spectrum {
     let si = scene.intersect_ray(ray);

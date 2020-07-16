@@ -1,7 +1,14 @@
+pub mod builder;
 pub mod depth;
 pub mod direct;
 
-use crate::{accelerator::Accelerator, scene::Scene, spectrum::Spectrum, utils::morton_decode};
+use crate::{
+  accelerator::Accelerator,
+  camera::{Camera, Cameras},
+  scene::Scene,
+  spectrum::Spectrum,
+  utils::morton_decode,
+};
 use quick_maths::{Ray, Vec2, Vector, Zero};
 use std::fmt::Debug;
 
@@ -14,6 +21,7 @@ pub trait SamplingIntegrator: Debug {
     &self,
     position: Vec2,
     ray: &Ray,
+    camera: &Cameras,
     scene: &Scene<El, Acc>,
   ) -> Spectrum;
 }
@@ -48,8 +56,35 @@ fn render_sample<S: SamplingIntegrator, El, Acc: Accelerator>(
   scene: &Scene<El, Acc>,
   pos: Vec2,
 ) -> Spectrum {
+  let camera = &scene.camera;
   // TODO maybe this should include a weight?
-  let ray = scene.camera.sample_ray(pos);
+  let ray = camera.sample_ray(pos);
   // Write the sample to the position
-  s.sample(pos, &ray, scene)
+  s.sample(pos, &ray, camera, scene)
+}
+
+pub trait MonteCarloIntegrator: SamplingIntegrator {
+  /// What is the maximal amount of bounces before the integration stops.
+  /// There is no such thing as infinite bounces, just the max-value,
+  /// because if we ever reach that point we should stop.
+  fn max_depth(&self) -> u32;
+  /// At what point does russian kick in and start terminating paths
+  fn min_russian_roulette_depth(&self) -> u32;
+  /*
+  /// Returns whether or not this should terminate, with some indicating it should not and how
+  /// much to divide throughput by.
+  fn should_terminate(&self, depth: u32, throughput: Spectrum) -> Option<f32> {
+    // TODO implement this with a nice default implementation with random sampling and the like.
+    todo!()
+    /*
+    if depth < self.min_russian_roulette_depth() {
+      return Some(1.0);
+    } else if depth > self.max_depth() {
+      return None;
+    }
+    let p = throughtput.max().min(0.95);
+    Some(p).filter(|p| p > sampler.next())
+    */
+  }
+  */
 }

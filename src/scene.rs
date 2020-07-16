@@ -91,6 +91,7 @@ impl RawScene {
           far_clip: 1.0e3,
           aspect: 1.0,
         },
+        sampler: None,
       },
       // TODO fill in examples here
       shapes,

@@ -3,7 +3,7 @@ pub mod orthographic;
 pub mod perspective;
 pub mod projective;
 
-use crate::film::Film;
+use crate::{film::Film, sampler::Samplers};
 use quick_maths::{Ray, Transform4, Vec2};
 use std::fmt::Debug;
 
@@ -17,10 +17,16 @@ pub trait Camera: Debug {
 pub struct Cameras {
   /// local space --> world space
   to_world: Transform4,
+
   /// world space --> local space
   from_world: Transform4,
+
   /// The film for this camera
   film: Film,
+
+  /// Sampler for this camera
+  sampler: Samplers,
+
   /// Which specific version of this camera is it
   variant: Variant,
 }
@@ -34,8 +40,14 @@ pub enum Variant {
 }
 
 impl Cameras {
+  /// Returns the film for this camera
   pub fn film(&self) -> &Film { &self.film }
-  pub fn sample_ray(&self, sample_pos: Vec2) -> Ray {
+  /// Returns the sampler used
+  pub fn sampler(&self) -> &Samplers { &self.sampler }
+}
+
+impl Camera for Cameras {
+  fn sample_ray(&self, sample_pos: Vec2) -> Ray {
     use Variant::*;
     let local_ray = match &self.variant {
       Perspective(c) => c.sample_ray(sample_pos),

@@ -19,3 +19,12 @@ impl From<Builder> for Samplers {
     }
   }
 }
+
+impl Default for Builder {
+  fn default() -> Self {
+    Builder {
+      seed: 0,
+      variant: Variant::Uniform,
+    }
+  }
+}

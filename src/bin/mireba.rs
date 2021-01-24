@@ -5,6 +5,7 @@ use gfx::{
   integrator::direct::Direct,
   scene::{RawScene, Scene},
 };
+use serde;
 use std::{
   fs::File,
   io::{BufReader, BufWriter},

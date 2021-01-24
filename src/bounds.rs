@@ -193,6 +193,14 @@ impl Bounds3 {
   }
 }
 
+impl Bounds2 {
+  pub fn mesh_grid(&self) impl Iterator<Item=[u32; 2]> {
+    let min = self.min.ceil().cast();
+    let max = self.max.floor().cast();
+    (min.x()..max.x()).flat_map
+  }
+}
+
 pub trait Bounded: Debug {
   // This is not a cheap call, as it expects a computation of bounds, and doesn't just
   // read from a variable. If a cheap bounds is needed, store the result from this call.

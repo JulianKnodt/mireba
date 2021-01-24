@@ -4,7 +4,7 @@ use crate::{
   interaction::SurfaceInteraction,
   utils::triangulate,
 };
-use quick_maths::{Ray, Vec3, Vector};
+use quick_maths::{Ray3, Vec3, Vector};
 use std::{fs::File, io, io::BufRead, path::Path, str::FromStr};
 
 /// A group of faces
@@ -54,7 +54,7 @@ impl IndexedTriangles {
 }
 
 impl Shape for IndexedTriangles {
-  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
+  fn intersect_ray(&self, r: &Ray3) -> Option<SurfaceInteraction> {
     self
       .iter()
       .filter_map(|t| t.intersect_ray(r))

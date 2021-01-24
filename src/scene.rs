@@ -9,7 +9,7 @@ use crate::{
   spectrum::from_rgb,
   transform::Builder as TransformBuilder,
 };
-use quick_maths::{Ray, Vec3};
+use quick_maths::{Ray3, Vec3};
 use std::collections::HashMap;
 
 // TODO add Serde for RawScene
@@ -126,7 +126,7 @@ where
   // TODO build something that creates a scene from iterators of shapes
   // pub fn new(items: Vec<Lights>, ...)
   pub fn render<I: Integrator>(&self, int: I) { int.render(self); }
-  pub fn intersect_ray(&self, r: &Ray) -> Option<(SurfaceInteraction, &Shapes)> {
+  pub fn intersect_ray(&self, r: &Ray3) -> Option<(SurfaceInteraction, &Shapes)> {
     self.accelerator.intersect_ray(r)
   }
 }

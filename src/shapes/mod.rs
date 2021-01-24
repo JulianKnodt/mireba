@@ -10,13 +10,13 @@ use crate::{
   bsdf::BSDFImpl,
   interaction::SurfaceInteraction,
 };
-use quick_maths::{Ray, Transform4};
+use quick_maths::{Ray3, Transform4};
 use std::{fmt::Debug, ptr::NonNull};
 
 /// Generic shape trait
 pub trait Shape: Debug + Bounded {
   // fn sample_position(&self, sample: Vec2) -> Vec3;
-  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction>;
+  fn intersect_ray(&self, r: &Ray3) -> Option<SurfaceInteraction>;
 }
 
 /// List of all currently allowed shapes
@@ -59,7 +59,7 @@ impl Shapes {
   }
   pub fn bsdf(&self) -> &BSDFImpl { unsafe { self.bsdf.as_ref() } }
 
-  pub fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
+  pub fn intersect_ray(&self, r: &Ray3) -> Option<SurfaceInteraction> {
     // TODO apply world transforms here to ray and then apply to transformation later
     use Variant::*;
     match &self.variant {

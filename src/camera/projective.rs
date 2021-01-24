@@ -1,5 +1,5 @@
 use super::Camera;
-use quick_maths::{Ray, Transform4, Vec2, Vec3};
+use quick_maths::{Ray3, Transform4, Vec2, Vec3};
 
 /// Generic perspective camera
 #[derive(Debug)]
@@ -19,12 +19,12 @@ impl Projective {
 
 impl Camera for Projective {
   /// Returns a ray in local space
-  fn sample_ray(&self, sample_pos: Vec2) -> Ray {
+  fn sample_ray(&self, sample_pos: Vec2) -> Ray3 {
     let local_origin = Vec3::of(0.0);
     let local_dir = self
       .raster_to_camera
       .apply_point(&Vec3::new(sample_pos.x(), sample_pos.y(), 0.0))
       .norm();
-    Ray::new(local_origin, local_dir)
+    Ray3::new(local_origin, local_dir)
   }
 }

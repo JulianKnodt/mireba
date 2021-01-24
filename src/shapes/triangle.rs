@@ -3,7 +3,7 @@ use crate::{
   bounds::{Bounded, Bounds3},
   interaction::{Interaction, SurfaceInteraction},
 };
-use quick_maths::{Ray, Vec2, Vec3, Vector};
+use quick_maths::{Ray3, Vec2, Vec3, Vector};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Triangle<V = Vec3>(pub Vec3<V>);
@@ -19,7 +19,7 @@ impl Bounded for Triangle {
 }
 
 impl Shape for Triangle {
-  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
+  fn intersect_ray(&self, r: &Ray3) -> Option<SurfaceInteraction> {
     let &Self(Vector([v0, v1, v2])) = self;
     let eps = 0.00001;
     let e1 = v1 - v0;
@@ -68,7 +68,7 @@ impl Triangle {
   }
   /*
     /// Intersection type 2
-    pub fn intersect2(&self, r: &Ray<T>) -> Option<Visibility<T>> {
+    pub fn intersect2(&self, r: &Ray3<T>) -> Option<Visibility<T>> {
       let norm = self.normal().norm();
       let w = norm.dot((self.0).0);
       // TODO determine whether to tests both sides of the triangle or just one?
@@ -90,7 +90,7 @@ impl Triangle {
       }
       Some(vis)
     }
-    pub fn moller_trumbore(&self, r: &Ray<T>) -> Option<Visibility<T>> {
+    pub fn moller_trumbore(&self, r: &Ray3<T>) -> Option<Visibility<T>> {
       let &Triangle(Vec3(v0, v1, v2)) = self;
       let eps = T::from(0.00001).unwrap();
       let e1 = v1 - v0;
@@ -165,10 +165,10 @@ mod triangle_properties {
     }
   }
   /*
-  use quick_maths::Ray;
+  use quick_maths::Ray3;
   use quickcheck::TestResult;
   quickcheck! {
-    fn intersection(r: Ray, t: Triangle) -> TestResult {
+    fn intersection(r: Ray3, t: Triangle) -> TestResult {
       match t.moller_trumbore(&r) {
         None => TestResult::discard(),
         Some(v) => TestResult::from_bool(t.contains(&v.pos)),

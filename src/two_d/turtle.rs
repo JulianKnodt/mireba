@@ -23,15 +23,15 @@ impl From<Builder> for Turtle {
 
 /// Turtle which can move through arbitrary space
 #[derive(Clone, Debug)]
-pub struct Turtle<T = f32, V = Vec2<T>> {
-  pub state: Ray<T, V>,
-  saves: Vec<Ray<T, V>>,
+pub struct Turtle {
+  pub state: Ray<f32, 2>,
+  saves: Vec<Ray<f32, 2>>,
 
   rules: HashMap<u8, TurtleInstruction>,
 }
 
-impl<T, V> Turtle<T, V> {
-  pub fn at(position: V, dir: V) -> Self {
+impl Turtle {
+  pub fn at(position: Vec2, dir: Vec2) -> Self {
     Turtle {
       state: Ray::new(position, dir),
       saves: vec![],
@@ -40,9 +40,9 @@ impl<T, V> Turtle<T, V> {
   }
 }
 
-impl<T: Copy, V: Copy> Turtle<T, V> {
-  pub fn curr_pos(&self) -> V { self.state.pos }
-  pub fn curr_dir(&self) -> V { self.state.dir }
+impl Turtle {
+  pub fn curr_pos(&self) -> Vec2 { self.state.pos }
+  pub fn curr_dir(&self) -> Vec2 { self.state.dir }
   pub fn save(&mut self) { self.saves.push(self.state); }
   pub fn load(&mut self) {
     if let Some(prev) = self.saves.pop() {

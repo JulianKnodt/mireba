@@ -4,7 +4,7 @@ use crate::{
   interaction::{Interaction, SurfaceInteraction},
   utils::quad_solve,
 };
-use quick_maths::{Ray, Vec2, Vec3};
+use quick_maths::{Ray3, Vec2, Vec3};
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Sphere {
@@ -28,7 +28,7 @@ impl Sphere {
 }
 
 impl Shape for Sphere {
-  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
+  fn intersect_ray(&self, r: &Ray3) -> Option<SurfaceInteraction> {
     let from_sphere = r.pos - self.center;
     let b = 2.0 * r.dir.dot(&from_sphere);
     let c = from_sphere.sqr_magn() - self.radius * self.radius;
@@ -67,11 +67,11 @@ impl Bounded for Sphere {
 #[cfg(test)]
 mod test_sphere {
   use super::Sphere;
-  use crate::{vec::Ray, vis::Visible};
+  use crate::{vec::Ray3, vis::Visible};
   use quickcheck::TestResult;
   quickcheck! {
     // tests that a ray with a t inside the sphere actually hit it
-    fn inside_sphere(r: Ray<f32>, t: f32, sphere: Sphere<f32>) -> TestResult {
+    fn inside_sphere(r: Ray3<f32>, t: f32, sphere: Sphere<f32>) -> TestResult {
       if t.is_sign_negative() { return TestResult::discard() };
       let inside = sphere.contains(&r.at(t));
       if !inside { return TestResult::discard() }

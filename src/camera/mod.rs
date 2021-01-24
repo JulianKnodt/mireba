@@ -4,12 +4,12 @@ pub mod perspective;
 pub mod projective;
 
 use crate::{film::Film, sampler::Samplers};
-use quick_maths::{Ray, Transform4, Vec2};
+use quick_maths::{Ray3, Transform4, Vec2};
 use std::fmt::Debug;
 
 pub trait Camera: Debug {
   /// Sample a ray from the camera using the given uv in [0,1]^2.
-  fn sample_ray(&self, sample_pos: Vec2) -> Ray;
+  fn sample_ray(&self, sample_pos: Vec2) -> Ray3;
 }
 
 /// Common struct for all cameras
@@ -47,7 +47,7 @@ impl Cameras {
 }
 
 impl Camera for Cameras {
-  fn sample_ray(&self, sample_pos: Vec2) -> Ray {
+  fn sample_ray(&self, sample_pos: Vec2) -> Ray3 {
     use Variant::*;
     let local_ray = match &self.variant {
       Perspective(c) => c.sample_ray(sample_pos),

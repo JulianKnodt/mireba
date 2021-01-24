@@ -1,5 +1,5 @@
 use super::{projective::Projective, Camera};
-use quick_maths::{Ray, Transform4, Vec2, Vec3};
+use quick_maths::{Ray3, Transform4, Vec2, Vec3};
 
 #[derive(Debug)]
 pub struct Orthographic(Projective);
@@ -14,7 +14,7 @@ impl Orthographic {
 }
 
 impl Camera for Orthographic {
-  fn sample_ray(&self, sample_pos: Vec2) -> Ray { self.0.sample_ray(sample_pos) }
+  fn sample_ray(&self, sample_pos: Vec2) -> Ray3 { self.0.sample_ray(sample_pos) }
 }
 
 /*

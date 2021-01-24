@@ -4,7 +4,7 @@ use crate::{
   interaction::SurfaceInteraction,
   shapes::Shapes,
 };
-use quick_maths::{Ray, Vector};
+use quick_maths::{Ray3, Vector};
 
 // DO NOT CHANGE SMALL_SIZE
 const SMALL_SIZE: usize = 256;
@@ -13,8 +13,8 @@ const MEDIUM_SIZE: usize = 4096;
 #[derive(Debug)]
 enum NodeStorage {
   // num_items, storage
-  Small(u8, Box<Vector<u32, SMALL_SIZE>>),
-  Medium(u16, Box<Vector<u32, MEDIUM_SIZE>>),
+  Small(u8, Box<Vector<SMALL_SIZE, u32>>),
+  Medium(u16, Box<Vector<MEDIUM_SIZE, u32>>),
   // Large(u16, Vector<u32, 65536>),
 }
 
@@ -69,7 +69,7 @@ impl Node {
   }
   fn upgrade_storage(&mut self) {
     let upgrade = match &self.storage {
-      NodeStorage::Small(n, v) => NodeStorage::Medium(*n as u16, Box::new(v.zxtend())),
+      NodeStorage::Small(n, v) => NodeStorage::Medium(*n as u16, Box::new(v.extend(0))),
       NodeStorage::Medium(_, _) => panic!("Unimplemented upgrading medium storage size"),
     };
     self.storage = upgrade;
@@ -133,7 +133,7 @@ impl Octree {
   }
   pub fn total_bounds(&self) -> &Bounds3 { &self.nodes[0].bounds }
   /// Checks all items for a given node and ray
-  fn node_intersect_ray(&self, node_idx: u32, r: &Ray) -> Option<(SurfaceInteraction, &Shapes)> {
+  fn node_intersect_ray(&self, node_idx: u32, r: &Ray3) -> Option<(SurfaceInteraction, &Shapes)> {
     let node = &self.nodes[node_idx as usize];
     node.storage.items().iter().fold(None, |prev, &i| {
       let shape = &self.shapes[i as usize].0;
@@ -152,7 +152,7 @@ impl Octree {
       }
     })
   }
-  fn naive_intersect(&self, node_idx: u32, ray: &Ray) -> Option<(SurfaceInteraction, &Shapes)> {
+  fn naive_intersect(&self, node_idx: u32, ray: &Ray3) -> Option<(SurfaceInteraction, &Shapes)> {
     let own_intersection = self.node_intersect_ray(node_idx, ray);
     let node = &self.nodes[node_idx as usize];
     if !node.has_children() {
@@ -195,7 +195,7 @@ impl Accelerator for Octree {
     shapes.sort_by_cached_key(|(_, b)| b.volume() as u32);
     Octree::new(bounds, shapes)
   }
-  fn intersect_ray(&self, r: &Ray) -> Option<(SurfaceInteraction, &Shapes)> {
+  fn intersect_ray(&self, r: &Ray3) -> Option<(SurfaceInteraction, &Shapes)> {
     self.naive_intersect(0, r)
   }
 }

@@ -1,6 +1,6 @@
 use linalg::{
   num::{Float},
-  vec::{Ray, Vec2, Vec3, Vector},
+  vec::{Ray3, Vec2, Vec3, Vector},
 };
 use crate::{
   bounds::Bounds,
@@ -13,7 +13,7 @@ use rand_distr::{Distribution, Standard};
 pub trait Cam<T: Float> {
   /// Takes a point on the raster([0, resolution_max])
   /// And returns a ray from the camera to the point on the raster in world space.
-  fn ray_to(&self, uv: Vec2<T>) -> Ray<T>;
+  fn ray_to(&self, uv: Vec2<T>) -> Ray3<T>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -83,7 +83,7 @@ where
   }
   /// Gets a unit vector in the forward direction
   pub fn fwd(&self) -> Vec3<T> { (self.center() - self.pos).norm() }
-  pub fn rays(&self, n: u32, xy: Vec2<T>) -> impl Iterator<Item = Ray<T>> + '_
+  pub fn rays(&self, n: u32, xy: Vec2<T>) -> impl Iterator<Item = Ray3<T>> + '_
   where
     Standard: Distribution<T>, {
     let Vec2(x, y) = xy;
@@ -93,9 +93,9 @@ where
 }
 
 impl<T: Float> Cam<T> for Camera<T> {
-  fn ray_to(&self, uv: Vec2<T>) -> Ray<T> {
+  fn ray_to(&self, uv: Vec2<T>) -> Ray3<T> {
     let Vec2(u, v) = uv;
-    Ray::new(
+    Ray3::new(
       self.pos,
       self.ll_corner + self.hori * v + self.vert * u - self.pos,
     )
@@ -162,7 +162,7 @@ impl<T: Float> OrthographicCamera<T> {
       lens_rad,
     ))
   }
-  pub fn rays(&self, n: u32, xy: Vec2<T>) -> impl Iterator<Item = Ray<T>> + '_
+  pub fn rays(&self, n: u32, xy: Vec2<T>) -> impl Iterator<Item = Ray3<T>> + '_
   where
     Standard: Distribution<T>, {
     let Vec2(x, y) = xy;
@@ -172,7 +172,7 @@ impl<T: Float> OrthographicCamera<T> {
 }
 
 impl<T: Float> Cam<T> for OrthographicCamera<T> {
-  fn ray_to(&self, uv: Vec2<T>) -> Ray<T> {
+  fn ray_to(&self, uv: Vec2<T>) -> Ray3<T> {
     let pos = uv.extend(T::zero());
     // point in camera space
     let pos = self.0.screen_to_raster.apply_inv_pt(&pos);
@@ -183,7 +183,7 @@ impl<T: Float> Cam<T> for OrthographicCamera<T> {
       .cam_to_world
       .apply_vec(&Vec3(T::zero(), T::zero(), T::one()))
       .norm();
-    Ray::new(pos, dir)
+    Ray3::new(pos, dir)
   }
 }
 
@@ -210,7 +210,7 @@ impl<T: Float> PerspectiveCamera<T> {
       lens_rad,
     ))
   }
-  pub fn rays(&self, n: u32, xy: Vec2<T>) -> impl Iterator<Item = Ray<T>> + '_
+  pub fn rays(&self, n: u32, xy: Vec2<T>) -> impl Iterator<Item = Ray3<T>> + '_
   where
     Standard: Distribution<T>, {
     let Vec2(x, y) = xy;
@@ -220,13 +220,13 @@ impl<T: Float> PerspectiveCamera<T> {
 }
 
 impl<T: Float> Cam<T> for PerspectiveCamera<T> {
-  fn ray_to(&self, uv: Vec2<T>) -> Ray<T> {
+  fn ray_to(&self, uv: Vec2<T>) -> Ray3<T> {
     let raster_pos = uv.extend(T::zero());
     // point in camera space
     let dir = self.0.screen_to_raster.apply_inv_pt(&raster_pos);
     let dir = self.0.cam_to_screen.apply_inv_pt(&dir).norm();
     let dir = self.0.cam_to_world.apply_vec(&dir).norm();
     let pos = self.0.cam_to_world.apply_pt(&Vec3::zero());
-    Ray::new(pos, dir)
+    Ray3::new(pos, dir)
   }
 }

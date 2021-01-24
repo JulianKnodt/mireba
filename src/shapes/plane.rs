@@ -3,7 +3,7 @@ use crate::{
   bounds::{Bounded, Bounds3},
   interaction::{Interaction, SurfaceInteraction},
 };
-use quick_maths::{Ray, Vec2, Vec3, Vector, Zero};
+use quick_maths::{Ray3, Vec2, Vec3, Vector, Zero};
 
 /// Represents a plane in 3d space
 /// Defined by the equation (P * NormaL) + w = 0
@@ -48,7 +48,7 @@ impl Plane {
 }
 
 impl Shape for Plane {
-  fn intersect_ray(&self, r: &Ray) -> Option<SurfaceInteraction> {
+  fn intersect_ray(&self, r: &Ray3) -> Option<SurfaceInteraction> {
     let d = self.normal.dot(&r.dir);
     if d.is_zero() {
       return None;
@@ -80,7 +80,7 @@ impl Bounded for Plane {
 mod test_plane {
   use super::Plane;
   use super::Shape;
-  use quick_maths::Ray;
+  use quick_maths::Ray3;
   use quickcheck::TestResult;
   quickcheck! {
     fn repr_point_on_plane(plane: Plane) -> bool {
@@ -89,7 +89,7 @@ mod test_plane {
   }
   quickcheck! {
     // Tests that any ray not parallel to the plane hits it
-    fn hits_plane(r: Ray, plane: Plane) -> TestResult {
+    fn hits_plane(r: Ray3, plane: Plane) -> TestResult {
       match plane.intersect_ray(&r) {
         None => TestResult::discard(),
         Some(si) => TestResult::from_bool(plane.on_plane(&si.it.p)),

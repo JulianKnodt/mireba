@@ -11,7 +11,7 @@ pub trait Sampler: Debug {
   /// Creates a new instance with a given seed
   fn new(seed: u64) -> Self;
   fn sample(&mut self) -> DefaultFloat;
-  fn sample_vec<const N: usize>(&mut self) -> Vector<DefaultFloat, N>;
+  fn sample_vec<const N: usize>(&mut self) -> Vector<N, DefaultFloat>;
   // fn sample_spectrum(&mut self) -> Spectrum
 }
 

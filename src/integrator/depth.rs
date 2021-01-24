@@ -5,7 +5,7 @@ use crate::{
   scene::Scene,
   spectrum::{self, Spectrum},
 };
-use quick_maths::{Ray, Vec2, Zero};
+use quick_maths::{Ray3, Vec2, Zero};
 
 #[derive(Debug)]
 pub struct Depth {
@@ -16,7 +16,7 @@ impl SamplingIntegrator for Depth {
   fn sample<El, Acc: Accelerator>(
     &self,
     _position: Vec2,
-    ray: &Ray,
+    ray: &Ray3,
     _camera: &Cameras,
     scene: &Scene<El, Acc>,
   ) -> Spectrum {

@@ -1,6 +1,6 @@
 use super::SamplingIntegrator;
 use crate::{accelerator::Accelerator, scene::Scene, spectrum::Spectrum};
-use quick_maths::{Ray, Vec2, Zero};
+use quick_maths::{Ray3, Vec2, Zero};
 
 #[derive(Debug)]
 pub struct Path {
@@ -12,7 +12,7 @@ impl SamplingIntegrator for Path {
   fn sample<El, Acc: Accelerator>(
     &self,
     _position: Vec2,
-    mut ray: &Ray,
+    mut ray: &Ray3,
     scene: &Scene<El, Acc>,
   ) -> Spectrum {
     let si = scene.intersect_ray(ray);
@@ -48,7 +48,7 @@ impl SamplingIntegrator for Path {
         break
       }
       eta *= bsdf_sample.ior;
-      ray = Ray::new(si.it.pos, bsdf_sample.wo);
+      ray = Ray3::new(si.it.pos, bsdf_sample.wo);
       si = scene.intersect_ray(ray);
       // TODO sample ray here for some emitter sampling
     }

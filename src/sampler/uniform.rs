@@ -10,7 +10,7 @@ pub struct Uniform(SmallRng);
 impl Sampler for Uniform {
   fn new(seed: u64) -> Self { Uniform(SmallRng::seed_from_u64(seed)) }
   fn sample(&mut self) -> DefaultFloat { self.0.gen() }
-  fn sample_vec<const N: usize>(&mut self) -> Vector<DefaultFloat, N> {
+  fn sample_vec<const N: usize>(&mut self) -> Vector<N, DefaultFloat> {
     Vector::with(|_| self.sample())
   }
 }

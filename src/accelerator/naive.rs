@@ -1,6 +1,6 @@
 use super::Accelerator;
 use crate::{interaction::SurfaceInteraction, shapes::Shapes};
-use quick_maths::Ray;
+use quick_maths::Ray3;
 
 #[derive(Debug)]
 pub struct Naive {
@@ -13,7 +13,7 @@ impl Accelerator for Naive {
     let shapes = i.collect::<Vec<_>>();
     Self { shapes }
   }
-  fn intersect_ray(&self, r: &Ray) -> Option<(SurfaceInteraction, &Shapes)> {
+  fn intersect_ray(&self, r: &Ray3) -> Option<(SurfaceInteraction, &Shapes)> {
     self
       .shapes
       .iter()

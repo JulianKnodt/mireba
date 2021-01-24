@@ -1,4 +1,4 @@
-use quick_maths::{Float, Ray, Vec3, Vector};
+use quick_maths::{Float, Ray3, Vec3, Vector};
 use std::fmt::Debug;
 
 /// Returns whether two intervals overlap
@@ -31,16 +31,16 @@ impl OctantOrder {
 /// Axis Aligned bounding box
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Bounds<const N: usize> {
-  pub min: Vector<f32, N>,
-  pub max: Vector<f32, N>,
+  pub min: Vector<N, f32>,
+  pub max: Vector<N, f32>,
 }
 
 pub type Bounds3 = Bounds<3>;
 pub type Bounds2 = Bounds<2>;
 
 impl<const N: usize> Bounds<N> {
-  pub fn new(min: Vector<f32, N>, max: Vector<f32, N>) -> Self { Self { min, max } }
-  pub fn valid(a: Vector<f32, N>, b: Vector<f32, N>) -> Self {
+  pub fn new(min: Vector<N, f32>, max: Vector<N, f32>) -> Self { Self { min, max } }
+  pub fn valid(a: Vector<N, f32>, b: Vector<N, f32>) -> Self {
     let (min, max) = a.sift(&b);
     Self::new(min, max)
   }
@@ -48,7 +48,7 @@ impl<const N: usize> Bounds<N> {
   /// If they have the same coordinates for one of the sides it will still return true
   pub fn contains(&self, o: &Self) -> bool { self.max >= o.max && self.min <= o.min }
 
-  pub fn contains_vec(&self, o: &Vector<f32, N>) -> bool {
+  pub fn contains_vec(&self, o: &Vector<N, f32>) -> bool {
     for i in 0..N {
       if self.min[i] > o[i] || self.max[i] < o[i] {
         return false;
@@ -60,20 +60,20 @@ impl<const N: usize> Bounds<N> {
   /// whether or not this bounding box contains a vector
   /// Returns whether edges of the other bounding box are fully contained in this one.
   pub fn strictly_contains(&self, o: &Self) -> bool { self.max > o.max && self.min < o.min }
-  pub fn diagonal(&self) -> Vector<f32, N> { self.max - self.min }
+  pub fn diagonal(&self) -> Vector<N, f32> { self.max - self.min }
 
   pub fn union(&self, o: &Self) -> Self {
     let (min, _) = self.min.sift(&o.min);
     let (_, max) = self.max.sift(&o.max);
     Self::new(min, max)
   }
-  pub fn union_vec(&self, v: &Vector<f32, N>) -> Self {
+  pub fn union_vec(&self, v: &Vector<N, f32>) -> Self {
     let (min, _) = self.min.sift(&v);
     let (_, max) = self.max.sift(&v);
     Self::new(min, max)
   }
-  pub fn center(&self) -> Vector<f32, N> { Vector::with(|i| (self.min[i] + self.max[i]) / 2.0) }
-  pub fn empty(v: Vector<f32, N>) -> Self { Bounds::new(v, v) }
+  pub fn center(&self) -> Vector<N, f32> { Vector::with(|i| (self.min[i] + self.max[i]) / 2.0) }
+  pub fn empty(v: Vector<N, f32>) -> Self { Bounds::new(v, v) }
 }
 
 impl Bounds3 {
@@ -86,7 +86,7 @@ impl Bounds3 {
   }
   /// Returns whether this bounding box intersects this ray.
   /// Can possibly intersect backwards.
-  pub fn intersect_ray(&self, r: &Ray) -> bool {
+  pub fn intersect_ray(&self, r: &Ray3) -> bool {
     let Vector([lx, ly, lz]) = self.min;
     let Vector([hx, hy, hz]) = self.max;
     let Vector([px, py, pz]) = &r.pos;
@@ -101,7 +101,7 @@ impl Bounds3 {
     t_max >= t_min.max(0.0)
   }
   /// Computes the distance from a ray to the box and also the normal to the box
-  pub fn intersects_ray_params(&self, r: &Ray) -> Option<(f32, Vec3)> {
+  pub fn intersects_ray_params(&self, r: &Ray3) -> Option<(f32, Vec3)> {
     let Vector([lx, ly, lz]) = self.min;
     let Vector([hx, hy, hz]) = self.max;
     let Vector([px, py, pz]) = &r.pos;
@@ -194,10 +194,10 @@ impl Bounds3 {
 }
 
 impl Bounds2 {
-  pub fn mesh_grid(&self) impl Iterator<Item=[u32; 2]> {
-    let min = self.min.ceil().cast();
-    let max = self.max.floor().cast();
-    (min.x()..max.x()).flat_map
+  pub fn mesh_grid(&self) -> impl Iterator<Item = [u32; 2]> {
+    let min = self.min.ceil().apply_fn(|v| v as u32);
+    let max = self.max.floor().apply_fn(|v| v as u32);
+    (min.x()..max.x()).flat_map(move |x| (min.y()..max.y()).map(move |y| [x, y]))
   }
 }
 
@@ -210,11 +210,11 @@ pub trait Bounded: Debug {
 #[cfg(test)]
 mod bounds_test {
   use super::Bounds3;
-  use quick_maths::Ray;
+  use quick_maths::Ray3;
   use quickcheck::{quickcheck, TestResult};
   quickcheck! {
     // Tests that a ray that lands inside the box will correctly intersect the box
-    fn inside_box(r: Ray, t: f32, bounds: Bounds3) -> TestResult {
+    fn inside_box(r: Ray3, t: f32, bounds: Bounds3) -> TestResult {
       if t.is_sign_negative() { return TestResult::discard() }
       let inside = bounds.contains_vec(&r.at(t));
       if !inside { return TestResult::discard() }

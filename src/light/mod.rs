@@ -2,7 +2,7 @@ pub mod dir;
 pub mod point;
 
 use crate::{interaction::Interaction, spectrum::Spectrum};
-use quick_maths::Ray;
+use quick_maths::Ray3;
 use std::fmt::Debug;
 
 pub trait Light: Debug {
@@ -12,7 +12,7 @@ pub trait Light: Debug {
   */
   /// Casts a ray towards an interaction of the scene, returning a ray representing the
   /// direction and the light emitted towards it
-  fn sample_towards(&self, it: &Interaction) -> (Ray, Spectrum);
+  fn sample_towards(&self, it: &Interaction) -> (Ray3, Spectrum);
 }
 
 // pub mod point;
@@ -24,7 +24,7 @@ pub enum Lights {
 }
 
 impl Lights {
-  pub fn sample_towards(&self, it: &Interaction) -> (Ray, Spectrum) {
+  pub fn sample_towards(&self, it: &Interaction) -> (Ray3, Spectrum) {
     use Lights::*;
     match self {
       Point(p) => p.sample_towards(it),

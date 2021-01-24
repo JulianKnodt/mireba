@@ -1,6 +1,6 @@
 use super::Light;
 use crate::{interaction::Interaction, spectrum::Spectrum};
-use quick_maths::{Ray, Vec3};
+use quick_maths::{Ray3, Vec3};
 
 /// Represents a direction light source
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -26,10 +26,10 @@ impl Dir {
 }
 
 impl Light for Dir {
-  fn sample_towards(&self, it: &Interaction) -> (Ray, Spectrum) {
+  fn sample_towards(&self, it: &Interaction) -> (Ray3, Spectrum) {
     let pos = it.p - self.offset_dir;
     (
-      Ray::new(pos, self.offset_dir.norm()),
+      Ray3::new(pos, self.offset_dir.norm()),
       self.spectrum * self.intensity,
     )
   }

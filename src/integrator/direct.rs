@@ -1,6 +1,6 @@
 use super::SamplingIntegrator;
 use crate::{accelerator::Accelerator, camera::Cameras, scene::Scene, spectrum::Spectrum};
-use quick_maths::{Ray, Vec2, Zero};
+use quick_maths::{Ray3, Vec2, Zero};
 
 #[derive(Debug)]
 pub struct Direct {
@@ -11,7 +11,7 @@ impl SamplingIntegrator for Direct {
   fn sample<El, Acc: Accelerator>(
     &self,
     _position: Vec2,
-    ray: &Ray,
+    ray: &Ray3,
     _camera: &Cameras,
     scene: &Scene<El, Acc>,
   ) -> Spectrum {
